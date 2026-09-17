@@ -10,7 +10,7 @@ Chosen for $0 budget, laptop-CPU-first compute, and the brief's "implement and e
 | Cleaning/chunking | Custom Python (boilerplate strip, dedup by hash, structure-aware 256–512-token chunks + overlap + section header prefix) | Chunking is a graded design choice — must be ours and documented |
 | Sparse retrieval | rank_bm25 default; Pyserini or Elasticsearch if 300k–600k chunks prove too slow | Zero-ops first; engine hidden behind `SparseRetriever` interface |
 | Dense retrieval | sentence-transformers `all-MiniLM-L6-v2` (baseline), `BAAI/bge-m3` (Colab T4 upgrade) | CPU-feasible baseline; upgrade path measured, not assumed |
-| Vector index | FAISS (flat IVF for ~500k chunks) | Local, no server |
+| Vector index | FAISS `IndexIVFFlat` (nlist ≈ 1000, nprobe ≈ 50) for ~500k chunks; exact `IndexFlatIP` as config fallback | Local, no server; IVF is approximate — `index.train(vectors)` required before `add()` |
 | Hybrid fusion | Reciprocal Rank Fusion (k=60) | Course-designated approach; ~20 lines, explainable |
 | Re-ranker | `BAAI/bge-reranker-v2-m3` cross-encoder | Inference-only, biggest single retrieval gain |
 | Generator | Ollama local (Qwen2.5-7B or Llama-3.1-8B) behind `Generator` interface; free-tier hosted API (e.g., Gemini Flash) optional for demo/RAGAS | Pluggable by constraint; local model guarantees offline reproducibility |
