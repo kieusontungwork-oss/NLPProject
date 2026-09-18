@@ -1,10 +1,10 @@
-# Checkpoint flags (per the stories schema; caller-only — the implementing dev skill never reads them):
+# Checkpoint flags (per the stories schema; caller-only: the implementing dev skill never reads them):
 #   spec_checkpoint: true -> a human reviews this story's spec between planning and implementation.
 #   done_checkpoint: true -> dispatch pauses after this story completes, before anything further runs.
 # A story may carry both (e.g., story 6: spec reviewed up front, and completion gates the eval set).
 
 - id: "1"
-  title: Week-0 data spike — verify arXiv candidates and pick the KB source
+  title: "Week-0 data spike: verify arXiv candidates and pick the KB source"
   description: >-
     Downloads test slices of the three arXiv full-text candidates (S2ORC cs.*, HF scientific_papers,
     Kaggle arXiv dumps) and produces the source decision plus sparse-engine decision data. Covers the
@@ -17,20 +17,21 @@
     _bmad-output/planning-artifacts/research/ as a dated data-spike note.
 
 - id: "2"
-  title: Knowledge-base pipeline — clean, dedup, chunk, and stats
+  title: "Knowledge-base pipeline: clean, dedup, chunk, and stats"
   description: >-
     Build the one-command KB rebuild from the chosen source: boilerplate stripping, content-hash
     dedup, section-aware chunking with header prefixes, metadata retention, and kb_stats.json.
     Implements CAP-1.
   done_checkpoint: true
   invoke_dev_with: >-
-    Chunking is a graded design choice per the brief — implement structure-aware 256-512-token
+    Chunking is a graded design choice per the brief: implement structure-aware 256-512-token
     chunks with ~15% overlap, abstract as its own chunk, title+section header prefix on every chunk.
-    kb_stats.json must report papers, chunks, words, and types (unique words) — these are the exact
-    Q1 numbers. Output chunk JSONL per the schema in pipeline-stages.md.
+    kb_stats.json must report papers, chunks, words, and types (unique words): the four figures
+    Question 1.3 of papers/AI6127_Assignment.md asks to report. Output chunk JSONL per the schema
+    in pipeline-stages.md.
 
 - id: "3"
-  title: Baseline retrieval — BM25 + dense + RRF hybrid
+  title: "Baseline retrieval: BM25 + dense + RRF hybrid"
   description: >-
     Implement the three baseline legs (sparse, dense, hybrid fusion) behind toggleable interfaces
     with per-stage latency logging. Implements CAP-2.
@@ -40,7 +41,7 @@
     API returning the RRF-fused ranking; log per-stage latency.
 
 - id: "4"
-  title: Eval harness v1 — retrieval metrics from qrels
+  title: "Eval harness v1: retrieval metrics from qrels"
   description: >-
     Wire ir_measures into a make eval target that scores any retrieval configuration against qrels
     and emits metrics.json plus the ablation-table skeleton. Implements the retrieval half of CAP-5.
@@ -50,7 +51,7 @@
     small seed qrels file now; story 6 replaces it with the labeled set.
 
 - id: "5"
-  title: Retrieval innovations — rerank, query rewrite, section-aware weighting + ablation matrix
+  title: "Retrieval innovations: rerank, query rewrite, section-aware weighting + ablation matrix"
   description: >-
     Add cross-encoder re-ranking, HyDE/multi-query rewriting, and section-aware weighting as config
     flags, then generate the full ablation ladder (E1-E4, E5a HyDE, E5b multi-query, E6) with
@@ -61,10 +62,10 @@
     harness from story 4. Query-rewrite routing is mode-specific: HyDE embeddings feed the dense
     leg only (BM25 keeps the raw user query); multi-query variants hit both legs with per-leg RRF
     pooling. Retain at least 2 documented failed-before/works-now queries per kept
-    innovation. Section-aware weighting is the novelty hook — prioritize it.
+    innovation. Section-aware weighting is the novelty hook, so prioritize it.
 
 - id: "6"
-  title: Labeling sprint — qrels pooling, QA pairs, guidelines, IAA report
+  title: "Labeling sprint: qrels pooling, QA pairs, guidelines, IAA report"
   description: >-
     Write the >=250 research questions, pool candidates, write labeling guidelines, run the
     100-record pilot, execute the full labeling pass with 15-20% double-labeling, and produce the
@@ -79,7 +80,7 @@
     story coordinates it.
 
 - id: "7"
-  title: Grounded generator — Ollama LLM, citations, insufficient-evidence path, self-check ablation
+  title: "Grounded generator: Ollama LLM, citations, insufficient-evidence path, self-check ablation"
   description: >-
     Build the pluggable generator conditioned strictly on the evidence pack, with numbered
     citations, a programmatic resolvability check, the not-enough-evidence path, and the E7
@@ -92,12 +93,12 @@
     prompt makes the model emit an INSUFFICIENT_EVIDENCE marker when passages do not support an
     answer. Acceptance test on the unanswerable slice: fires on >=80% of unanswerable questions,
     <=10% false-fire on answerable. Programmatic citation resolvability (every [n] maps to a
-    retrieved chunk) must be 100% — make it a test. Generator behind a pluggable interface (Ollama
+    retrieved chunk) must be 100%, so make it a test. Generator behind a pluggable interface (Ollama
     local default, free-tier API swappable); model choice is an open question in SPEC.md, keep it
     configurable.
 
 - id: "8"
-  title: Answer-level evaluation — RAGAS, EM/F1, speed protocol
+  title: "Answer-level evaluation: RAGAS, EM/F1, speed protocol"
   description: >-
     Extend the harness with RAGAS answer-level metrics, EM/F1 on the extractive subset, and the
     five-query speed protocol with per-stage latency breakdown. Completes CAP-5.
@@ -107,25 +108,25 @@
     records/sec for the performance section of Q4.
 
 - id: "9"
-  title: Streamlit UI — grounded answers with inspectable evidence
+  title: "Streamlit UI: grounded answers with inspectable evidence"
   description: >-
     Build the simple Streamlit app: question in, cited answer out, retrieved papers, supporting
     passages, source links, retrieval inspector, and the five recorded demo queries. Implements
     CAP-7 (assignment Q2).
   invoke_dev_with: >-
-    Keep it deliberately simple — the brief explicitly discourages sophisticated UI. Must run on
+    Keep it deliberately simple; the brief explicitly discourages sophisticated UI. Must run on
     laptop CPU. The five demo queries are fixed and their per-query speed is recorded from the UI
-    run (Q2 requirement) — persist those measurements.
+    run (Q2 requirement); persist those measurements.
 
 - id: "10"
-  title: Report and reproducibility — README, zips, group-numbered PDF
+  title: "Report and reproducibility: README, zips, group-numbered PDF"
   description: >-
     Assemble the final deliverables: README enabling full reproduction, data zip and code zip with
     cloud-drive links, and the single PDF named by group number answering Q1-Q5 mapped 1:1 to
     capabilities. Implements CAP-8.
   done_checkpoint: true
   invoke_dev_with: >-
-    Single PDF named <group_number>.pdf (Blackboard, first submission only counts — target
+    Single PDF named <group_number>.pdf (Blackboard, first submission only counts; target
     2026-11-05, deadline 2026-11-07 23:59 SGT). Names + matric numbers on page 1; include pictures
     per the brief. Data zip: KB, 5 queries + results, eval datasets, ablation data. Code zip:
     source + README (clone, install, rebuild KB, eval, UI). Success = a teammate reproduces from

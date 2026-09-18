@@ -1,14 +1,14 @@
-# PaperPilot — Team Split & Deliverables Map (companion to SPEC.md)
+# PaperPilot: Team Split & Deliverables Map (companion to SPEC.md)
 
 Assignment grading: KB construction 20 / Retrieval 40 / Downstream 40. The brief allows up to three subgroups.
 
-## Subgroups (roster TBD — open question)
+## Subgroups (roster TBD; open question)
 
 | Subgroup            | Owns                                                                                                                                | Points |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| A — Knowledge Base | CAP-1 (acquisition, cleaning, chunking, stats), CAP-6 question writing + qrels labeling coordination                                | 20     |
-| B — Retrieval      | CAP-2 (BM25/dense/RRF), CAP-3 innovations + ablation harness (= CAP-5 retrieval half: ir_measures/qrels), retrieval inspector in UI | 40     |
-| C — Downstream     | CAP-4 generator + citations, RAGAS eval (CAP-5 answer-level), CAP-7 UI shell, CAP-8 report assembly                                 | 40     |
+| A: Knowledge Base | CAP-1 (acquisition, cleaning, chunking, stats), CAP-6 question writing + qrels labeling coordination                                | 20     |
+| B: Retrieval | CAP-2 (BM25/dense/RRF), CAP-3 innovations + ablation harness (= CAP-5 retrieval half: ir_measures/qrels), retrieval inspector in UI | 40     |
+| C: Downstream | CAP-4 generator + citations, RAGAS eval (CAP-5 answer-level), CAP-7 UI shell, CAP-8 report assembly                                 | 40     |
 
 **Notes**:
 
@@ -17,9 +17,9 @@ Assignment grading: KB construction 20 / Retrieval 40 / Downstream 40. The brief
 
 ## `make eval` ownership (CAP-5 interface between B and C)
 
-- One harness, never forked: B builds the core (`make eval`, config registry, `metrics.json` skeleton, ablation runner — story 4); C extends it with answer-level metrics (story 8).
+- One harness, never forked: B builds the core (`make eval`, config registry, `metrics.json` skeleton, ablation runner) in story 4; C extends it with answer-level metrics (story 8).
 - Namespaced output in `reports/metrics.json`: B owns `retrieval.*` rows; C owns `answer.*` (RAGAS, EM/F1) and `speed.*` rows.
-- Trigger rule: whoever changes a retrieval-side config (flags, RRF k, rerank depth, …) re-runs their own section immediately and flags C — retrieval changes also invalidate `answer.*` (evidence packs change), so C re-runs before the next milestone/report cut.
+- Trigger rule: whoever changes a retrieval-side config (flags, RRF k, rerank depth, …) re-runs their own section immediately and flags C; retrieval changes also invalidate `answer.*` (evidence packs change), so C re-runs before the next milestone/report cut.
 - Report rule (CAP-8): every report number cites the committed `metrics.json`, never an ad-hoc run; the binding reproduction is the full `make eval` from clean state at the 10-30 freeze.
 
 ## Question → capability map (report skeleton)
@@ -34,7 +34,7 @@ Assignment grading: KB construction 20 / Retrieval 40 / Downstream 40. The brief
 
 ## Submission checklist (owner: C, checked by all)
 
-- [ ] Single PDF named `<group_number>.pdf` — names + matric numbers page 1, Q1–Q5 answers, pictures included (brief explicitly asks)
+- [ ] Single PDF named `<group_number>.pdf`: names + matric numbers page 1, Q1-Q5 answers, pictures included (brief explicitly asks)
 - [ ] Data zip link (Drive/Dropbox): KB, 5 queries + retrieved results, eval datasets, Q3/Q5 ablation data
 - [ ] Code zip link: source + README (clone → install → rebuild → eval → UI), libs included/documented
 - [ ] Week-13 slides (prepped post-submission, zero grading risk)
@@ -44,7 +44,7 @@ Assignment grading: KB construction 20 / Retrieval 40 / Downstream 40. The brief
 | When                  | Milestone                                                                                   |
 | --------------------- | ------------------------------------------------------------------------------------------- |
 | Week 0 (by ~09-19)    | Data spike: verify arXiv candidates bytes-on-disk; pick source; sparse-engine decision data |
-| Week 1–2 (by ~10-03) | CAP-1 done: KB built + stats; CAP-2 baselines running |
+| Week 1-2 (by ~10-03) | CAP-1 done: KB built + stats; CAP-2 baselines running |
 | Week 3 (by ~10-10)    | CAP-2 solid; generator choice made; qrels pooling starts                                    |
 | Week 4 (by ~10-17)    | CAP-3 innovations flagged + first ablation matrix; labeling sprint running                  |
 | Week 5 (by ~10-24)    | CAP-4/5 complete: answers + RAGAS + full matrix; UI working                                 |
