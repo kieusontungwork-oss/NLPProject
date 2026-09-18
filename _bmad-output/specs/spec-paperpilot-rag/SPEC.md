@@ -11,7 +11,10 @@ sources:
 
 ## Why
 
-AI6127 group assignment (35% of grade) mandates a RAG system: an offline-indexed knowledge base (≥10,000 docs / ≥100,000 words), a self-implemented retriever (sparse + dense + hybrid, optional re-ranker), and a generator solving a downstream task — graded 20/40/40 across KB/retrieval/generation, with novelty, usefulness, and user-friendliness weighting the score. PaperPilot answers this with **research question answering over a large arXiv corpus**: finding evidence in thousands of papers is hard because terminology varies across papers, lexical search misses semantically relevant work, dense search misses exact technical terms, and raw LLMs hallucinate. The project's thesis — and its measurable contribution — is that **combining lexical retrieval, semantic retrieval, and neural re-ranking yields more reliable, evidence-grounded answers than any single method**, demonstrated by a full ablation ladder rather than a single working pipeline.
+- AI6127 assignment (35%): RAG system with KB (20) / retrieval (40) / generation (40)
+- Corpus: ≥10,000 docs / ≥100,000 words; retriever = sparse + dense + hybrid (+ optional re-ranker); generator solves a downstream task
+- Problem: varied terminology, lexical search misses semantics, dense search misses exact terms, raw LLMs hallucinate
+- Combining lexical + semantic retrieval + neural re-ranking yields more reliable, evidence-grounded answers than any single method, proven via testing the pipeline incrementally, one component at a time, and measuring the impact of each addition
 
 ## Capabilities
 
