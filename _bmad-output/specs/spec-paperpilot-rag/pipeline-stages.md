@@ -47,8 +47,12 @@ Every optional stage is a config flag (see stack.md swap rule) so the ablation m
 
 **Why section-aware weighting sits before fusion:** applied after the top-50 → top-10 re-rank cut it could only reorder the 10 surviving chunks, leaving P@10/Recall@10 unchanged, so E6 would be a near no-op. As a pre-fusion boost it shapes each leg's ranking and thus which 50 chunks the cross-encoder sees (recall prior at first stage, semantic precision at re-rank). Note: the chunk `header_prefix` already gives BM25/embeddings implicit section context; this flag is the explicit rank prior. Fallback if E6 gains are weak: post-rerank score blend (`rerank_score + λ·section_weight` on the top-50) as an extra ablation row.
 
+**Candidate depth (pinned 2026-10-12):** the boost is applied to each leg's `candidate_depth` = **300** retrieved chunks (config value), the leg re-sorts, and only then is the top-50 cut taken into RRF. Applying the boost to an already-truncated top-50 reproduces the same no-op one stage earlier — a relevant Methods chunk at rank 63 could never be promoted. E6 reports the depth it used; 50 vs 300 is one ablation row if time permits.
+
+**Section weights (pinned initial values):** abstract 1.3 · methodology/methods 1.5 · results 1.4 · conclusion 1.3 · related work 0.8 · other 1.0. These are the documented initial values (tunable on the dev slice); the report quotes them as-is.
+
 **Insufficient-evidence trigger (defined, testable):** a two-stage gate, both stages config-flagged.
-1. *Score gate (pre-LLM, cheap):* when rerank is on, if the best cross-encoder score is below threshold `τ` (calibrated on a ~50-question dev slice, never a hard-coded default), return the canned "not enough evidence in the library" response without calling the generator.
+1. *Score gate (pre-LLM, cheap):* when rerank is on, if the best cross-encoder score is below threshold `τ` (calibrated ONLY on the 40-question unanswerable dev half — never the 60-question held-out half the reported fire rate comes from; recalibrate whenever the reranker model changes, since score scales differ), return the canned "not enough evidence in the library" response without calling the generator.
 2. *Generator-declared:* the prompt instructs the model to emit an `INSUFFICIENT_EVIDENCE` marker when the passages do not support an answer; the marker maps to the canned response. This is the primary trigger in rerank-off configs and the semantic backstop everywhere.
 
 Rejected: thresholding dense-leg cosine; in a hybrid+rerank pipeline the dense leg is not the final signal (BM25-strong queries would misfire), and cosine values are model-dependent (MiniLM vs bge-m3), so a fixed 0.25 wouldn't survive the planned embedding swap. Acceptance test on the unanswerable slice: gate fires on ≥80% of unanswerable questions with ≤10% false-fire on answerable (both rates reported via `make eval`).
@@ -73,8 +77,8 @@ Metrics per run: P@5/P@10, Recall@10/100, MRR, nDCG@10 on qrels; downstream answ
 
 ## Knowledge-base schema
 
-Per paper: `arxiv_id, title, authors[], year, abstract, sections{...}, source_link, license`.
-Per chunk (JSONL, one per line): `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix` (title + section header prepended for context). Dedup by content hash before chunking; `kb_stats.json` = {papers, chunks, words, types, chunk-size histogram}.
+Per paper: `arxiv_id, title, authors[], year, abstract, sections{...}, source_link, license, categories[]`. Title/authors/year/categories/license come from the **arXiv metadata join** (public `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json`, keyed by arxiv_id; pre-2007 ids need their slash re-inserted) — the source dataset carries none of them. A paper with no metadata row is dropped, not emitted with nulls (citations must resolve to a real title 100% of the time).
+Per chunk (JSONL, one per line): `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix` (title + section header prepended for context). Dedup by content hash before chunking; `kb_stats.json` = {papers, chunks, words, types, chunk-size histogram, year_min, year_max, year histogram, category composition}.
 
 ## Chunking design (graded design choice; document it in the report)
 

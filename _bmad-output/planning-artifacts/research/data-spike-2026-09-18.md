@@ -64,3 +64,20 @@ Plan v2 (2026-09-18) reduced Story 1's "sparse-engine decision data" to the chun
 - Machine: 255GB free disk (50GB requirement ✓), Linux laptop (plan assumed MacBooks — no impact on the decision).
 - Legacy `scientific_papers.py` script-based loader works with modern `datasets` only via the raw S3 URL path documented here (the HF datasets-viewer no longer converts this dataset); the ranged-zip slicer (`research/spike/scripts/download_scientific_papers_slice.py`) is the reproducible acquisition path and downloads only ~21MB per 200-paper probe.
 - Production acquisition sketch for Story 2: one 3.5GB zip download → stream-parse `train.txt` (JSONL) → filter AI/ML/NLP by arXiv id against a categories snapshot (public `arxiv-metadata-oai.json` head or arXiv API) → 10k+ papers without any PDF parsing.
+
+## Follow-up measurement (2026-10-12) — yield + year range (PR #1 review items)
+
+Script: `research/spike/scripts/measure_categories_years.py` (arXiv API, 200/200 slice ids resolved; raw output `research/spike/data/scientific_papers/yield_years_measurement.json`). Dataset quirk found: pre-2007 arXiv ids are stored slash-less (`nlin0608019`); the id join must re-insert the slash (`nlin/0608019`) before matching the categories snapshot.
+
+| Metric | Measured (n=200) | Extrapolated to ~215k split |
+|---|---|---|
+| AI/ML/NLP share (`cs.AI/CL/LG/CV/IR`, `stat.ML`) | **3.5%** (7/200) | **~7.5k papers — BELOW the 10k floor** |
+| cs.* share (any cs.* category) | **7.5%** (15/200) | **~16.1k papers — clears 10k with margin** |
+| Year range | **1995 – 2017** | no post-2017 papers exist in this source |
+
+Sampling caveat: n=200 puts a wide CI on the shares (cs.* 95% CI ≈ 4.4–11.9% → 9.5k–25.6k), so Story 2 treats the full-download filter count as ground truth with a verification gate (below).
+
+**Decisions (recorded 2026-10-12):**
+
+1. **KB composition:** filter the split to **cs.\*** (all computer-science categories) → expected ~16k papers pre-clean, comfortably above the 10k hard floor even after dedup/cleaning. AI/ML/NLP (~7.5k) remains the primary subcollection and the question-writing target; neighboring cs papers widen the library (realistic distractors, on-theme). Widening to *all* arXiv categories is the contingency if the cs.* filter yields <12k pre-clean — composition is reported in `kb_stats.json` either way. GCS-PDF top-up (2018–2020) rejected: parse-heavy and loses the section structure that drove the source choice.
+2. **Year cutoff accepted:** the corpus ends 2017 (Cohan et al. 2018 cut). Eval questions are written only about topics answerable from papers in range; `kb_stats.json` records `year_min/year_max` + a year histogram. LLM/RAG/GenAI-as-2020-field questions are out of scope; pre-2017 precursors (seq2seq, attention, early QA) are in.

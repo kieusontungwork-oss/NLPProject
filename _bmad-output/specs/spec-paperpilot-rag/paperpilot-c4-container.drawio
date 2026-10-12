@@ -1,0 +1,246 @@
+<mxfile host="65bd71144e" compressed="false">
+    <diagram id="paperpilot-c4-container" name="C4 Container">
+        <mxGraphModel dx="1287" dy="1132" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="sys-paperpilot" value="PaperPilot — laptop-local RAG system (no server deployment)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontStyle=1;fontColor=#3B6FA8;container=1;collapsible=0;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="100" width="660" height="940" as="geometry"/>
+                </mxCell>
+                <mxCell id="svc-ui" value="&lt;b&gt;Streamlit Query UI&lt;/b&gt;&lt;br&gt;cited answers + retrieval inspector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="40" y="60" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="svc-retriever" value="&lt;b&gt;Retriever&lt;/b&gt;&lt;br&gt;BM25 + dense + RRF hybrid&lt;br&gt;cross-encoder rerank · section-aware" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="280" y="140" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="svc-generator" value="&lt;b&gt;Generator&lt;/b&gt;&lt;br&gt;grounded QA · numbered citations&lt;br&gt;insufficient-evidence gate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="280" y="300" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="note-config" value="&lt;b&gt;Ablation flags&lt;/b&gt;&lt;br&gt;each innovation on/off via config" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#ffffff;strokeColor=#999999;align=left;spacingLeft=8;verticalAlign=top;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="40" y="200" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="idx-bm25" value="Sparse Index&lt;br&gt;BM25 (rank_bm25 / FTS5)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="500" y="140" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="idx-faiss" value="Dense Index&lt;br&gt;FAISS (MiniLM-L6 / bge-m3)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="500" y="260" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="store-kb" value="KB Store&lt;br&gt;10k+ papers · chunks · metadata" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="500" y="380" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="job-indexer" value="&lt;b&gt;Indexer&lt;/b&gt;&lt;br&gt;(make index)" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="500" y="520" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="job-kb-builder" value="&lt;b&gt;KB Builder&lt;/b&gt;&lt;br&gt;download · clean · dedup · chunk" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="40" y="430" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="job-eval" value="&lt;b&gt;Eval Harness&lt;/b&gt;&lt;br&gt;ir_measures · EM/F1 · RAGAS" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="40" y="580" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="store-evalset" value="Eval Set&lt;br&gt;JSONL ≥1,000 · qrels" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="40" y="720" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="store-reports" value="Reports&lt;br&gt;metrics.json · ablations" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="sys-paperpilot" vertex="1">
+                    <mxGeometry x="280" y="840" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ext-hf-dataset" value="HF scientific_papers&lt;br&gt;(arXiv split)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#333333;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="20" y="80" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ext-ollama" value="Ollama (local)&lt;br&gt;Qwen2.5-7B / Llama-3.1-8B" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#333333;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="880" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ext-hosted-llm" value="Hosted LLM API&lt;br&gt;(free tier)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontColor=#333333;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="1000" width="180" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="actor-user" value="Researcher" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="300" width="60" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="actor-annotator" value="Annotator (2-3)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="580" width="60" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-user-ui" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="actor-user" target="svc-ui" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-user-ui-lbl" value="(0) ask" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-user-ui" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-ui-retr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="1" source="svc-ui" target="svc-retriever" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-ui-retr-lbl" value="(1) retrieve(query, k)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-ui-retr" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-retr-bm25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="svc-retriever" target="idx-bm25" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-retr-bm25-lbl" value="(2) sparse BM25" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-retr-bm25" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-retr-faiss" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="svc-retriever" target="idx-faiss" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-retr-faiss-lbl" value="(2) dense ANN" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-retr-faiss" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-retr-kb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" parent="1" source="svc-retriever" target="store-kb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-retr-kb-lbl" value="(3) passages + metadata" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-retr-kb" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-retr-ollama" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#d79b00;dashed=1;" parent="1" source="svc-retriever" target="ext-ollama" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-retr-ollama-lbl" value="(2b) HyDE / multi-query rewrite" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-retr-ollama" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-ui-gen" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;exitX=1;exitY=0.65;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="svc-ui" target="svc-generator" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-ui-gen-lbl" value="(4) question + top passages" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-ui-gen" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-gen-ollama" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="svc-generator" target="ext-ollama" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-gen-ollama-lbl" value="(5) grounded prompt" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-gen-ollama" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-gen-hosted" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#d79b00;dashed=1;" parent="1" source="svc-generator" target="ext-hosted-llm" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-gen-hosted-lbl" value="pluggable: hosted free-tier" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-gen-hosted" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-gen-kb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" parent="1" source="svc-generator" target="store-kb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-gen-kb-lbl" value="resolve citations" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-gen-kb" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-builder-hf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="job-kb-builder" target="ext-hf-dataset" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-builder-hf-lbl" value="(A) download corpus" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-builder-hf" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-builder-kb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;" parent="1" source="job-kb-builder" target="store-kb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-builder-kb-lbl" value="(B) chunks + metadata" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-builder-kb" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-indexer-kb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;" parent="1" source="job-indexer" target="store-kb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-indexer-kb-lbl" value="read chunks" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-indexer-kb" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-indexer-bm25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="job-indexer" target="idx-bm25" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-indexer-bm25-lbl" value="build inverted index" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-indexer-bm25" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-indexer-faiss" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;" parent="1" source="job-indexer" target="idx-faiss" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-indexer-faiss-lbl" value="embed + build index" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-indexer-faiss" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-ann-evalset" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;" parent="1" source="actor-annotator" target="store-evalset" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-ann-evalset-lbl" value="≥1,000 labeled records (JSONL + qrels)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-ann-evalset" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-eval-evalset" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;" parent="1" source="job-eval" target="store-evalset" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-eval-evalset-lbl" value="read QA pairs + qrels" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-eval-evalset" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-eval-retr" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;exitX=1;exitY=0.15;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="job-eval" target="svc-retriever" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-eval-retr-lbl" value="run ablation configs" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-eval-retr" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-eval-gen" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;exitX=1;exitY=0.38;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="job-eval" target="svc-generator" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-eval-gen-lbl" value="EM/F1 + RAGAS inputs" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-eval-gen" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-eval-ollama" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#333333;exitX=1;exitY=0.62;exitDx=0;exitDy=0;" parent="1" source="job-eval" target="ext-ollama" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-eval-ollama-lbl" value="RAGAS LLM-judge" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-eval-ollama" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-eval-reports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.85;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="job-eval" target="store-reports" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-eval-reports-lbl" value="metrics.json + ablation tables" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-eval-reports" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="e-builder-reports" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jettySize=auto;orthogonalLoop=1;endArrow=blockThin;endFill=1;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="job-kb-builder" target="store-reports" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-builder-reports-lbl" value="kb_stats.json" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="e-builder-reports" vertex="1" connectable="0">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="legend" value="&lt;b&gt;Legend&lt;/b&gt;&lt;hr&gt;&lt;font color=#6c8ebf&gt;■&lt;/font&gt; service / module&lt;br&gt;&lt;font color=#d79b00&gt;■&lt;/font&gt; build / eval job&lt;br&gt;&lt;font color=#82b366&gt;■&lt;/font&gt; datastore / artifact&lt;br&gt;&lt;font color=#999999&gt;■&lt;/font&gt; external system (dashed)&lt;br&gt;── black = sync call&lt;br&gt;┄┄ orange dashed = flag-gated / pluggable&lt;br&gt;── green thick = batch data flow" style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#ffffff;strokeColor=#999999;align=left;spacingLeft=8;verticalAlign=top;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="880" width="200" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="title" value="PaperPilot — C4 container diagram — v1 — 2026-09-18" style="text;html=1;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="700" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

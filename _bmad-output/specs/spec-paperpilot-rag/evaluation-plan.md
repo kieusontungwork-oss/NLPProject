@@ -4,14 +4,14 @@ Two labeled artifacts, both ours (the brief allows public datasets for backgroun
 
 ## 1. Retrieval qrels (feeds CAP-3/5, answers Q3)
 
-- **Query set:** ≥250 natural research questions over the corpus, written by the team across query types (terminology-mismatch queries, exact-term queries, survey-style queries, comparison queries), balanced across subfields (NLP/LLMs/RAG/CV/GenAI/ML).
-- **Pooling:** for each query, top-10 from BM25, dense, and RRF legs → pooled candidate passages; annotators judge relevance (2 = supporting evidence, 1 = related but insufficient, 0 = irrelevant).
-- **Scale:** pooling over ≥250 queries × ~30 candidates ≈ 7,500 judgments (subsample to fit effort); this plus QA-pair labels carries the total past the 1,000-record requirement with margin.
+- **Query set:** ≥250 natural research questions over the corpus, written by the team across query types (terminology-mismatch queries, exact-term queries, survey-style queries, comparison queries), balanced across subfields **present in the KB** (record `year_min/year_max` + composition from `kb_stats.json` first — the corpus ends 2017, so questions target pre-2018 topics: seq2seq, attention, early QA, topic models, classic CV/ML; 2020-era RAG/LLM questions are out of scope by construction).
+- **Pooling (two rounds, anti-pooling-bias):** round 1 — for each query, top-20 from BM25, dense, and RRF legs → pooled candidates, judged. **Round 2 (scheduled, Week 5):** after the innovation configs exist, add the top-10 of every E-ladder config (E4, E5a, E5b, E6, E6Δ) to the pool and judge the new candidates — otherwise innovations are penalized for finding passages the baselines missed (unjudged scores as non-relevant). Every ablation row reports `judged@10`; a row below ~90% judged is not comparable and must be re-pooled before entering the report.
+- **Scale:** round 1 pooling over ≥250 queries × ~60 candidates ≈ 15,000 judgments (subsample to fit effort); round 2 adds ~1,500–2,500 new candidates; this plus QA-pair labels carries the total past the 1,000-record requirement with margin.
 - **Output:** `data/eval/qrels.jsonl`: `{query_id, text, type, subfield}` and `{query_id, chunk_id, relevance}`.
 
 ## 2. QA eval set (feeds CAP-4/5, answers Q4)
 
-- ≥250 questions with gold short answers + evidence spans (extractable where possible so EM/F1 is computable); plus a fixed **25-question "unanswerable" slice (~10%)** to test the insufficient-evidence path, each verified unanswerable by searching the corpus and failing (construction rules in the labeling guidelines). RAGAS and EM/F1 are computed on the answerable subset only; the unanswerable slice feeds the sufficiency-gate rates.
+- ≥250 questions with gold short answers + evidence spans (extractable where possible so EM/F1 is computable); plus a fixed **100-question "unanswerable" slice**, split into a **40-question dev half** (used to calibrate the gate threshold τ and nothing else) and a **60-question held-out half** (used only for the reported fire rate) — the split is committed with the eval set and the halves never mix. At n=25 a pass/fail gate is statistically meaningless (one question = 4 points; 20/25 ≈ 80% has a 95% CI of ~61–92%); at n=60 the held-out rate is decidable. Unanswerable questions are the cheapest rows to label (no gold answer or span needed). RAGAS and EM/F1 are computed on the answerable subset only; the held-out half feeds the sufficiency-gate rates.
 - **Output:** `data/eval/qa_pairs.jsonl`: `{query_id, question, gold_answer, gold_chunk_ids[], answerable}`.
 
 ## 3. Annotation protocol (IAA ≥80% requirement)
@@ -25,11 +25,11 @@ Two labeled artifacts, both ours (the brief allows public datasets for backgroun
 
 | Layer | Metric | Tool | On |
 | --- | --- | --- | --- |
-| Retrieval | P@5/P@10, Recall@10/100, MRR, nDCG@10 | ir_measures | qrels, every ablation row |
+| Retrieval | P@5/P@10, Recall@10, MRR, nDCG@10, plus `judged@10` diagnostic | ir_measures | qrels, every ablation row |
 | QA (extractive subset) | Exact Match, token F1 | custom | qa_pairs |
-| RAG answer-level | Faithfulness, answer relevance, context precision, context recall | RAGAS (free-tier judge; Ollama fallback) | answerable-subset answers, E-ladder configs |
+| RAG answer-level | Faithfulness, answer relevance, context precision, context recall | RAGAS — **one judge fixed for the whole matrix**, judge model+version recorded in `metrics.json`; the judge must NOT be the generator model (self-judging inflates faithfulness); if the judge ever changes, every row re-runs. Raw judge responses cached to `reports/ragas-cache/` (committed at each milestone cut) — with a live LLM judge, caching is what makes `make eval` reproducible at all. Judged on a fixed 100-question subsample of the answerable set, not all of it (volume ≈ 5–10k judge calls otherwise; free-tier quota exhaustion is the normal case, plan for it) | answerable-subset answers, E-ladder configs |
 | Citation grounding | citation resolvability (each `[n]` → retrieved chunk) | custom programmatic | every generated answer (must be 100%) |
-| Sufficiency gate | fire rate on unanswerable questions, false-fire rate on answerable | custom | qa_pairs (target ≥80% / ≤10%) |
+| Sufficiency gate | fire rate on the 60-question held-out unanswerable half, false-fire rate on answerable | custom | qa_pairs (target ≥80% / ≤10%) |
 | Performance | p50/p95 latency per stage, records/sec, cost estimate, scalability note | timing logs | full system |
 
 ## 5. Q2 speed protocol

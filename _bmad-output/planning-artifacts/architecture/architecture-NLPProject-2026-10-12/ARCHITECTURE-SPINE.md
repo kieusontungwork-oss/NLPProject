@@ -68,7 +68,7 @@ graph TD
   1. **Source of truth, git-tracked, human-written:** code + `uv.lock`, `configs/`, `data/eval/*.jsonl` (qrels, qa_pairs), `data/eval/labeling/` (guidelines + agreement report), `data/eval/dossiers/` (failed-before/works-now query dossiers). Never machine-overwritten.
   2. **Rebuildable bulk, written only by `make kb`:** `data/raw/` (HF download), `data/kb/papers.jsonl` + `data/kb/chunks.jsonl` + `kb_stats.json`. `papers.jsonl` is the **single source of paper-level metadata** (title, authors, year, abstract, source_link, license) — retrieval, generation, and the UI read it; nobody re-derives paper metadata from chunks.
   3. **Derived, written only by `make index` / `make eval` / tooling, always deletable:** `indexes/` (FAISS + BM25 + manifests), `reports/` (metrics, section files, pooling candidate dumps for annotation, demo-run exports).
-  Every index artifact carries a manifest `{created, embedding_model, dim, nlist, chunk_store_hash, config_row}`; index loaders refuse to serve when `chunk_store_hash` ≠ current chunk store or `embedding_model` ≠ the configured model. Machine-drafted pooling candidates are class-3 (`reports/pooling/`); annotators label **from** them **into** class-1 qrels — class 1 stays human-written.
+  Every index artifact carries a manifest `{created, embedding_model, dim, chunk_store_hash, config_row}`; index loaders refuse to serve when `chunk_store_hash` ≠ current chunk store or `embedding_model` ≠ the configured model. The dense index defaults to **exact `IndexFlatIP`** (vectors normalised, IP = cosine) — `IndexIVFFlat` is a config row reserved for the Q4 scalability discussion, never ablation rows (approximate search would confound dense-vs-sparse deltas). Machine-drafted pooling candidates are class-3 (`reports/pooling/`); annotators label **from** them **into** class-1 qrels — class 1 stays human-written.
 
 ### AD-6 — Section files, single merge point [ADOPTED]
 
@@ -80,7 +80,7 @@ graph TD
 
 | Concern | Convention |
 | --- | --- |
-| Naming | package `paperpilot`; modules snake_case; engine interfaces are nouns (`SparseRetriever`, `DenseRetriever`, `Reranker`, `QueryRewriter`, `Generator`); config flags snake_case: `use_sparse`, `use_dense`, `rrf_k`, `use_rerank`, `rerank_depth`, `use_hyde`, `use_multi_query`, `use_section_weight`, `gate_tau`, `generator_model` |
+| Naming | package `paperpilot`; modules snake_case; engine interfaces are nouns (`SparseRetriever`, `DenseRetriever`, `Reranker`, `QueryRewriter`, `Generator`); config flags snake_case: `use_sparse`, `use_dense`, `rrf_k`, `use_rerank`, `rerank_model`, `rerank_depth`, `candidate_depth`, `use_hyde`, `use_multi_query`, `use_section_weight`, `section_weights`, `gate_tau`, `generator_model` |
 | Data & formats | JSONL UTF-8, one object per line (papers, chunks, qrels, qa_pairs); JSON for manifests / metrics / kb_stats; paper and chunk schemas exactly as `pipeline-stages.md` defines; timestamps ISO-8601 UTC; timings float milliseconds; corpus is English-only — the kb clean stage drops non-English text (spec constraint) |
 | Shared clients & models | one Ollama HTTP client and one sentence-transformers/HF model loader in `paperpilot.core.clients`, used by B's rewriter/embedder and C's generator alike — no duplicate engine clients; hosted free-tier adapters (generator swap, RAGAS judge) read keys from a git-ignored `.env`, never from code or config rows |
 | Metrics | `reports/metrics.json` namespaced `retrieval.*` (B), `answer.*` (C), `speed.*` (C), assembled per AD-6; every section file records its config row id + git commit |
@@ -101,7 +101,7 @@ graph TD
 | streamlit | 1.65.0 |
 | Ollama (local server) | model tag Qwen2.5-7B or Llama-3.1-8B — choice Week 3 |
 | Embedder baseline / upgrade | sentence-transformers/all-MiniLM-L6-v2 / BAAI/bge-m3 |
-| Cross-encoder | BAAI/bge-reranker-v2-m3 |
+| Cross-encoder (re-ranker) | two-tier behind the `Reranker` port: `cross-encoder/ms-marco-MiniLM-L-6-v2` (22.7M, CPU default) / `BAAI/bge-reranker-v2-m3` (0.6B, Colab T4, final matrix) — model id + depth are config rows; τ calibrated per model |
 | datasets (HF) | pin the spike-verified version at bootstrap (`armanc/scientific_papers` is script-based — `trust_remote_code=True`) |
 | torch / transformers (transitive) | resolved by `uv.lock` (committed); lock at bootstrap |
 
@@ -111,7 +111,7 @@ graph TD
 paperpilot/            # repo root
   src/paperpilot/
     core/              # ids (chunk_id hashing), schemas (EvidencePack), config, engine interfaces, clients (Ollama/HF loaders), timing
-    kb/                # A — acquisition, cleaning, dedup, chunking, papers.jsonl + kb_stats
+    kb/                # A — acquisition, metadata join, cleaning, dedup, chunking, papers.jsonl + kb_stats
     retrieval/         # B — sparse, dense, section-weight, RRF, rerank, rewriting, retrieve()
     generation/        # C — prompts, sufficiency gate, generator adapters, citations, self-check
     evaluation/        # B+C — ir_measures, EM/F1, RAGAS, ablation runner, section-file merge, speed protocol
@@ -168,7 +168,7 @@ flowchart LR
 
 ## Deferred
 
-- Sparse engine final pick (`rank_bm25` → SQLite FTS5 → Elasticsearch ladder; benchmark-gated at Story 3 prep — AD-1's port makes the swap a config row, not a fork).
+- Sparse engine final pick (`rank_bm25` → `bm25s` → SQLite FTS5 → Elasticsearch ladder; gate criteria = peak RSS + cold-start + p50 latency, benchmark-gated at Story 3 prep — AD-1's port makes the swap a config row, not a fork).
 - Generator model tag and free-tier hosted adapter (Week 3; behind `Generator` port).
 - Gate threshold `τ` value and its calibration protocol on the ~50-question dev slice (gate semantics already fixed in `pipeline-stages.md`).
 - E7 faithfulness self-check mechanism (Q5 default scope).

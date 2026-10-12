@@ -2,7 +2,7 @@
 
 Detailed walkthrough for the team. Modules, the RAG paths (offline build + online query), and the data model: how data is stored, added, and retrieved. Governance rules (AD-1…AD-6) reference the [Architecture Spine](../../_bmad-output/planning-artifacts/architecture/architecture-NLPProject-2026-10-12/ARCHITECTURE-SPINE.md); requirements reference the [SPEC](../../_bmad-output/specs/spec-paperpilot-rag/SPEC.md) and its companions.
 
-**One paragraph:** PaperPilot is a laptop-local RAG question-answering system over 10,000+ arXiv AI/ML/NLP papers. An offline pipeline (`make kb`, `make index`) turns a verified HF dataset download into a cleaned, chunked, content-hash-identified knowledge base plus BM25 and FAISS indexes. An online pipeline (`retrieve(query, k)` → generate) runs each question through optional query rewriting, dual-leg retrieval (BM25 + dense), section-aware weighting, RRF fusion, optional cross-encoder re-ranking, an insufficient-evidence gate, and a grounded LLM generator that answers with numbered citations. A single evaluation harness (`make eval`) iterates an ablation ladder of config rows and produces every number in the report. Python-only, no orchestration framework — every graded stage is code we wrote and can explain.
+**One paragraph:** PaperPilot is a laptop-local RAG question-answering system over 10,000+ arXiv CS papers (AI/ML/NLP as the primary subcollection, corpus years 1995–2017). An offline pipeline (`make kb`, `make index`) turns a verified HF dataset download — joined against the public arXiv metadata snapshot for title/authors/year/categories — into a cleaned, chunked, content-hash-identified knowledge base plus BM25 and FAISS indexes. An online pipeline (`retrieve(query, k)` → generate) runs each question through optional query rewriting, dual-leg retrieval (BM25 + dense), section-aware weighting, RRF fusion, optional cross-encoder re-ranking, an insufficient-evidence gate, and a grounded LLM generator that answers with numbered citations. A single evaluation harness (`make eval`) iterates an ablation ladder of config rows and produces every number in the report. Python-only, no orchestration framework — every graded stage is code we wrote and can explain.
 
 > **Interactive diagram:** [system-architecture.drawio](system-architecture.drawio) — open in [draw.io](https://app.diagrams.net) for the full picture (offline build · online RAG path · evaluation, color-coded by subgroup ownership and artifact class).
 
@@ -62,8 +62,9 @@ Corpus is static by spec (no live crawling). "Adding data" means re-running the 
 
 ```mermaid
 flowchart TD
-    DL["download: HF scientific_papers arxiv split<br/>(ranged S3 zip; 200-paper slice verified 2026-09-18)"] --> RAW["data/raw/ — pre-parsed JSONL<br/>(class 2 · make kb only)"]
-    RAW --> CLEAN["clean: strip boilerplate + references,<br/>drop non-English (spec: English-only corpus)"]
+    DL["download: HF scientific_papers arxiv split<br/>(ranged S3 zip; 200-paper slice verified 2026-09-18)"] --> RAW["data/raw/ — pre-parsed JSONL +<br/>arxiv-metadata-oai.json snapshot<br/>(class 2 · make kb only)"]
+    RAW --> JOIN["metadata join (per arxiv_id):<br/>fill title · authors · year · categories · license<br/>pre-2007 ids: re-insert slash (nlin/0608019)<br/>+ category filter → cs.* (~16k expected)"]
+    JOIN --> CLEAN["clean: strip boilerplate + references,<br/>drop non-English (spec: English-only corpus)"]
     CLEAN --> DEDUP["dedup: content hash per paper"]
     DEDUP --> CHUNK["chunk: structure-aware split at section boundaries<br/>256–512 tokens · ~15% overlap · abstract = own chunk ·<br/>header_prefix = paper title + section name"]
     CHUNK --> IDS["mint chunk_id = sha1-16hex(arxiv_id, section_name, normalize(text))<br/>— single core function, NFC + whitespace collapse (AD-2)"]
@@ -77,9 +78,9 @@ Then `make index` (B's `retrieval/`):
 ```mermaid
 flowchart LR
     CHUNKS["chunks.jsonl"] --> EMB["embed every chunk<br/>all-MiniLM-L6-v2 (CPU) / bge-m3 (Colab)"]
-    EMB --> FAISS["FAISS IndexIVFFlat<br/>nlist ≈ 1000 · train() then add()<br/>+ id-map chunk_id ↔ row"]
+    EMB --> FAISS["FAISS IndexFlatIP (exact, default)<br/>vectors normalised → IP = cosine<br/>380k × 384d ≈ 583MB · ~10–30ms/query<br/>+ id-map chunk_id ↔ row<br/>(IVFFlat = config row, Q4 scalability only)"]
     CHUNKS --> BM25["BM25 index (rank_bm25 first;<br/>FTS5 / ES are ladder fallbacks)"]
-    FAISS --> MAN["indexes/manifest.json<br/>created · embedding_model · dim · nlist ·<br/>chunk_store_hash · config_row (AD-5)"]
+    FAISS --> MAN["indexes/manifest.json<br/>created · embedding_model · dim ·<br/>chunk_store_hash · config_row (AD-5)"]
     BM25 --> MAN
 ```
 
@@ -99,7 +100,7 @@ flowchart TD
 
     RAWQ --> SPARSE["BM25 leg (rank_bm25 / FTS5 / ES behind SparseRetriever)"]
     MQ --> SPARSE
-    RAWQ --> DENSE["dense leg: embed query → FAISS IVF ANN search"]
+    RAWQ --> DENSE["dense leg: embed query → FAISS exact scan (FlatIP)"]
     HYDE --> DENSE
     MQ --> DENSE
 
@@ -107,7 +108,7 @@ flowchart TD
     DENSE --> SECTW
 
     SECTW --> RRF["hybrid fusion: Reciprocal Rank Fusion, k=60"]
-    RRF --> RR["cross-encoder re-rank (use_rerank)<br/>bge-reranker-v2-m3 reads query+passage together;<br/>loose top-50 in → true top-10 out"]
+    RRF --> RR["cross-encoder re-rank (use_rerank)<br/>two-tier config row: ms-marco-MiniLM-L6-v2 (CPU default)<br/>/ bge-reranker-v2-m3 (Colab, final matrix)<br/>depth 20 dev / 50 final → true top-10 out"]
 
     RR --> GATE{"insufficient-evidence gate<br/>(2-stage, both flagged)"}
     GATE -->|"best rerank score < τ"| CANNED["canned: not enough evidence in the library<br/>(no LLM call — cheap pre-generation block)"]
@@ -124,10 +125,10 @@ Stage-by-stage, what the machine does:
 
 1. **Query processing** — the raw query is recorded verbatim (`pack.query`); if rewriting is on, `effective_queries[]` records what each leg actually saw, labeled `raw`/`hyde`/`multi_query` (AD-3 — so RAGAS answer-relevancy never scores against a hallucinated passage thinking it was the user's words).
 2. **Dual-leg retrieval** — BM25 scores exact terms; dense embeds meaning (terminology mismatch fix). Each leg returns its own ranking with scores; per-stage latency is recorded.
-3. **Section-aware weighting** — a rank prior boosting evidence-bearing sections over boilerplate. Applied **pre-fusion** (post-re-rank it could only reorder survivors and E6 would be a near no-op). Fallback if gains are weak: post-rerank score blend as an extra ablation row.
+3. **Section-aware weighting** — a rank prior boosting evidence-bearing sections over boilerplate (pinned initial weights: methodology 1.5 · results 1.4 · abstract/conclusion 1.3 · related work 0.8 · other 1.0). Applied **pre-fusion** over each leg's full `candidate_depth` = 300 candidates, *then* the top-50 cut feeds RRF (post-re-rank it could only reorder survivors and E6 would be a near no-op; boosting an already-truncated list has the same no-op one stage earlier). Fallback if gains are weak: post-rerank score blend as an extra ablation row.
 4. **RRF fusion (k=60)** — ~20 explainable lines; the course-designated hybrid.
-5. **Cross-encoder re-rank** — cheap recall first (top-50), expensive precision second (top-10). The cross-encoder score is also the gate signal.
-6. **Insufficient-evidence gate** — two independent triggers: score gate `τ` (calibrated on a ~50-question dev slice) blocks hopeless questions before the LLM; the generator-declared marker catches look-relevant-but-aren't cases. Targets: fires on ≥80% unanswerable, ≤10% false-fire on answerable.
+5. **Cross-encoder re-rank** — cheap recall first (depth 20 dev / 50 final), expensive precision second (top-10). Two-tier by config: the 22.7M-param `ms-marco-MiniLM-L6-v2` on laptop CPU for the dev loop and UI; the 0.6B-param `bge-reranker-v2-m3` on free Colab for the final reported matrix. The cross-encoder score is also the gate signal — τ is calibrated per reranker model, since score scales differ.
+6. **Insufficient-evidence gate** — two independent triggers: score gate `τ` (calibrated only on the 40-question unanswerable dev half, disjoint from the 60-question held-out half that produces the reported rate) blocks hopeless questions before the LLM; the generator-declared marker catches look-relevant-but-aren't cases. Targets: fires on ≥80% of held-out unanswerable questions, ≤10% false-fire on answerable.
 7. **Grounded generation** — the LLM sees only the evidence pack. Every claim cites `[n]`; the citation checker resolves `[n]` strictly into the pack's hit list (this is the 100%-resolvability metric). E7 adds a faithfulness self-check as the answer-side ablation.
 
 Everything retrieval-side exits as ONE object — the **EvidencePack** (AD-3), the only B→C runtime contract:
@@ -191,7 +192,7 @@ Rule of thumb: **class 1 loses you the project if deleted** (hand labels); class
 ```mermaid
 flowchart LR
     CFG["configs/ablations.yaml<br/>E1 · E2 · E3 · E4 · E5a · E5b · E6 · E6Δ · E7<br/>(compared rows differ by exactly one flag)"] --> RUN["ablation runner:<br/>for each row: retrieve + generate over eval sets"]
-    QRELS["qrels.jsonl"] --> RET["ir_measures:<br/>P@5/P@10 · Recall@10/100 · MRR · nDCG@10"]
+    QRELS["qrels.jsonl"] --> RET["ir_measures:<br/>P@5/P@10 · Recall@10 · MRR · nDCG@10<br/>+ judged@10 diagnostic"]
     QA["qa_pairs.jsonl"] --> ANS["EM / F1 (extractive subset)<br/>RAGAS faithfulness · relevancy · ctx P/R<br/>gate rates (≥80% / ≤10%) · citation resolvability"]
     RUN --> RET
     RUN --> ANS
