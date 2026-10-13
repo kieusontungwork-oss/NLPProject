@@ -1,0 +1,33 @@
+# Installed by Foreman bootstrap — honest about an empty test suite:
+# runs pytest when tests/ exists, skips with a notice when it doesn't.
+name: Tests
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests
+        if: hashFiles('tests/**') != ''
+        run: |
+          pip install pytest
+          pytest -v
+
+      - name: No test suite yet
+        if: hashFiles('tests/**') == ''
+        run: echo "::notice::No tests/ directory found — add tests and this job will run them."
