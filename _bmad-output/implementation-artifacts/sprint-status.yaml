@@ -1,0 +1,72 @@
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created, ready for development
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed
+
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when its first story starts (via build's sprint sync)
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates the next story after the previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; the status view surfaces open ones
+generated: 10-13-2026 21:55
+last_updated: 10-13-2026 21:55
+project: NLPProject
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+# SCHEDULE MAP (sprint key -> spec story id in stories.yaml; freeze 10-30, submit 11-05):
+#   Week A (10-13 -> 10-17): 1-2 (A), 1-3 (B), 1-4 (B); start question writing; sparse-engine benchmark gate at 1-3 prep
+#   Week B (10-18 -> 10-24): 1-5 (B), 1-6 labeling sprint round 1+2 (whole team, A coordinates), 1-7 (C); tau calibration after 1-7
+#   Week C (10-25 -> 10-30): 1-8 (C), 1-9 (C), 1-10 draft (C); 10-30 freeze = clean-state make eval reproduction
+#   Buffer (11-01 -> 11-05): PDF + zips + teammate reproduction check; submit 11-05 (deadline 11-07 23:59 SGT)
+# RISKS: labeling sprint is the human-hours critical path (cut scope, never labels, if anything slips);
+#   ragas CVE-2026-6587 re-check before Week 5; schedule aggressive (stories 1-2..1-4 due within ~4 days).
+development_status:
+  epic-1: backlog
+  1-1-week-0-data-spike-verify-arxiv-candidates-and-pick-the-kb-so: done
+  1-2-knowledge-base-pipeline-clean-dedup-chunk-and-stats: backlog
+  1-3-baseline-retrieval-bm25-dense-rrf-hybrid: backlog
+  1-4-eval-harness-v1-retrieval-metrics-from-qrels: backlog
+  1-5-retrieval-innovations-rerank-query-rewrite-section-aware-wei: backlog
+  1-6-labeling-sprint-qrels-pooling-qa-pairs-guidelines-iaa-report: backlog
+  1-7-grounded-generator-ollama-llm-citations-insufficient-evidenc: backlog
+  1-8-answer-level-evaluation-ragas-em-f1-speed-protocol: backlog
+  1-9-streamlit-ui-grounded-answers-with-inspectable-evidence: backlog
+  1-10-report-and-reproducibility-readme-zips-group-numbered-pdf: backlog
+  epic-1-retrospective: optional
+
+# Pre-sprint logistics (not retrospective-committed; clear before/at kickoff)
+action_items:
+  - epic: 1
+    action: "Assign subgroup A/B/C roster in team-split.md (currently TBD)"
+    owner: "Kieusontung"
+    status: done
+  - epic: 1
+    action: "Get group number (needed for the <group_number>.pdf deliverable and report header)"
+    owner: "Kieusontung"
+    status: open
+  - epic: 1
+    action: "Dispose of SentiScope leftovers in scripts/, tests/, research/ before first pytest run (spine Deferred item)"
+    owner: "subgroup A"
+    status: open

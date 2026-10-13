@@ -2,13 +2,15 @@
 
 Assignment grading: KB construction 20 / Retrieval 40 / Downstream 40. The brief allows up to three subgroups.
 
-## Subgroups (roster TBD; open question)
+## Subgroups
 
-| Subgroup            | Owns                                                                                                                                | Points |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| A: Knowledge Base | CAP-1 (acquisition, cleaning, chunking, stats), CAP-6 question writing + qrels labeling coordination                                | 20     |
-| B: Retrieval | CAP-2 (BM25/dense/RRF), CAP-3 innovations + ablation harness (= CAP-5 retrieval half: ir_measures/qrels), retrieval inspector in UI | 40     |
-| C: Downstream | CAP-4 generator + citations, RAGAS eval (CAP-5 answer-level), CAP-7 UI shell, CAP-8 report assembly                                 | 40     |
+| Subgroup            | Members   | Owns                                                                                                                                | Points |
+| ------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| A: Knowledge Base | Member 1 | CAP-1 (acquisition, cleaning, chunking, stats), CAP-6 question writing + qrels labeling coordination                                | 20     |
+| B: Retrieval       | Member 2 | CAP-2 (BM25/dense/RRF), CAP-3 innovations + ablation harness (= CAP-5 retrieval half: ir_measures/qrels), retrieval inspector in UI | 40     |
+| C: Downstream      | Member 3 | CAP-4 generator + citations, RAGAS eval (CAP-5 answer-level), CAP-7 UI shell, CAP-8 report assembly                                 | 40     |
+
+**Load note:** A's coding load is lightest after story 1-2 lands — A flexes to help B (pooling dumps, ablation runs) or C (τ calibration, report figures) from Week B onward, besides coordinating the whole-team labeling sprint.
 
 **Notes**:
 
