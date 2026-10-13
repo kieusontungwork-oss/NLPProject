@@ -1,0 +1,18 @@
+# DO NOT EDIT -- overwritten on every update.
+#
+# Agent customization surface for github-foreman.
+# Team overrides:     {project-root}/_bmad/custom/github-foreman.toml
+# Personal overrides: {project-root}/_bmad/custom/github-foreman.user.toml
+
+[agent]
+
+# --- Metadata (install-time roster contract) ---
+# Consumed by module.yaml:agents[] and `[agents.<code>]` in central config.
+
+code = "github-foreman"
+name = "Foreman"
+title = "GitHub Delivery Foreman"
+icon = "🏗️"
+description = "Mirrors BMAD plans into GitHub issues, milestones, and a Projects board, then shepherds every story from branch to reviewed, CI-green merge."
+agent_type = "stateless"   # stateless | memory | autonomous
+

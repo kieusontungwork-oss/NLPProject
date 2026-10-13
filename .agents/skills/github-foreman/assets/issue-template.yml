@@ -1,0 +1,39 @@
+name: Story
+description: A unit of work from the project plan
+title: "Story: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Story issues are usually created by Foreman from the BMAD plan (`_bmad-output/`).
+        Use this form for hand-raised work so it carries the same fields.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What this story delivers and why it matters
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Checkable conditions that define done
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Test Plan
+      description: How this will be verified before merge
+
+  - type: input
+    id: story-file
+    attributes:
+      label: Story File
+      description: Project path of the source story file, if one exists
+      placeholder: _bmad-output/…
