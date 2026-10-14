@@ -69,4 +69,4 @@ action_items:
   - epic: 1
     action: "Dispose of SentiScope leftovers in scripts/, tests/, research/ before first pytest run (spine Deferred item)"
     owner: "subgroup A"
-    status: open
+    status: done
