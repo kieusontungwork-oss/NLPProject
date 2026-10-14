@@ -222,4 +222,5 @@ __marimo__/
 # Project-specific
 .DS_Store
 data/
+/research/
 .opencode/node_modules/

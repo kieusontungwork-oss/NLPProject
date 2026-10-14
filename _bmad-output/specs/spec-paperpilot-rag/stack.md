@@ -1,0 +1,22 @@
+# PaperPilot: Tech Stack (companion to SPEC.md)
+
+Chosen for $0 budget, laptop-CPU-first compute, and the brief's "implement and explain it yourselves" rule. Every external dependency is swappable behind a Python interface.
+
+| Component | Choice | Rationale / swap rule |
+| --- | --- | --- |
+| Language | Python 3.11+ (uv-managed venv) | Team-shared skillset; repo already uses uv scripts |
+| Paper acquisition | **HF `scientific_papers` arxiv split** (official S3 zip, ~3.5GB; 200-paper slice verified bytes-on-disk 2026-09-18) **+ arXiv metadata join** (`gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json`, public, 4.5GB — fills title/authors/year/categories/license; pre-2007 ids need the slash re-inserted; the join also performs the cs.* category filter, see the 2026-10-12 spike addendum). Fallbacks: S2AG `s2orc_v2` (needs S2 API key) → public GCS `arxiv-dataset` PDFs (no auth, parse-heavy) | Spike verdict: 99% sectioned pre-parsed JSONL; ranged-zip slicer script probes 200 papers for ~21MB; no live crawling; yield/year measurement 2026-10-12: split is 3.5% AI/ML/NLP (~7.5k), 7.5% cs.* (~16k), years 1995–2017 |
+| PDF/text parsing | Not needed on the winning path (pre-parsed JSONL). PyMuPDF is available if the GCS-PDF fallback activates; GROBID-class section parsing is out of $0/laptop scope | Parsing PDFs is a time sink; prefer pre-parsed text with section structure |
+| Cleaning/chunking | Custom Python (boilerplate strip, dedup by hash, structure-aware 256-512-token chunks + overlap + section header prefix) | Chunking is a graded design choice: must be ours and documented |
+| Sparse retrieval | Ladder (benchmark-gated at Story 3 prep, gate criteria = peak RSS + cold-start + p50 latency — at 190k–380k chunks memory/persistence bind, not query speed): `rank_bm25` first → `bm25s` (sparse matrices, save/load + mmap) → SQLite FTS5 `bm25()` → Elasticsearch last resort (pinned + docker-compose + `make index` rebuild); Pyserini skipped | Zero-ops first: BM25 transparency is graded; `rank_bm25` risk is ~GB RAM and no persistence; `bm25s` rung added 2026-10-12; engine hidden behind `SparseRetriever` interface, swap = config row |
+| Dense retrieval | sentence-transformers `all-MiniLM-L6-v2` (baseline), `BAAI/bge-m3` (Colab T4 upgrade) | CPU-feasible baseline; upgrade path measured, not assumed |
+| Vector index | **FAISS `IndexFlatIP` (exact) as the default** — normalise vectors first so IP = cosine; 380k × 384 dims ≈ 583MB RAM, brute force ~10–30ms/query on laptop CPU. `IndexIVFFlat` (nlist≈1000, nprobe≈50) kept as a config row **only for the Q4 scalability discussion**, reported with measured recall-vs-exact and speedup, never used for ablation rows (approximate search confounds dense-vs-sparse deltas) | Exact removes silent 2–8% IVF recall loss under every reported delta and deletes the `train()` step; IVF turned into a Q4 deliverable |
+| Hybrid fusion | Reciprocal Rank Fusion (k=60) | Course-designated approach; ~20 lines, explainable |
+| Re-ranker | Two-tier behind one `Reranker` interface, model id = config row: **`cross-encoder/ms-marco-MiniLM-L-6-v2` (~22.7M) is the CPU default** for iteration and the UI (~1800 docs/s on GPU-class, tens of ms/pair on laptop CPU); **`BAAI/bge-reranker-v2-m3` (~0.6B) runs on Colab T4 for the final reported matrix** | bge-v2-m3 on CPU ≈ 0.4s/pair → ~20s/query at depth 50 — unusable for the dev loop and the Q2 speed number. Rerank depth: 20 for the dev loop, 50 for the final matrix (both config values). Benchmark ms/pair on the actual laptops at story 5 prep; τ is calibrated per reranker model (score scales differ) |
+| Generator | Ollama local (Qwen2.5-7B or Llama-3.1-8B) behind `Generator` interface; free-tier hosted API (e.g., Gemini Flash) optional for demo/RAGAS | Pluggable by constraint; local model guarantees offline reproducibility |
+| Retrieval metrics | `ir_measures` | P@K, Recall@K, MRR, nDCG@10 straight from qrels |
+| RAG metrics | RAGAS | Faithfulness, answer relevance, context precision/recall |
+| UI | Streamlit | Proposal's choice; brief says keep it simple |
+| Orchestration | Plain Python modules + Makefile (`make kb / index / eval / ui`) | No LangChain/LlamaIndex, because the brief wants the stages implemented and explained by us; frameworks would obscure exactly what is graded |
+
+**Rule:** any component swap (sparse engine, embedding model, generator) happens behind its interface with a config flag, never a code fork; every swap is an ablation row, not a rebuild.
