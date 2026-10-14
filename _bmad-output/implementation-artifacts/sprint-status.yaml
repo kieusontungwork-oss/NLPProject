@@ -45,7 +45,7 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   epic-1: backlog
   1-1-week-0-data-spike-verify-arxiv-candidates-and-pick-the-kb-so: done
-  1-2-knowledge-base-pipeline-clean-dedup-chunk-and-stats: backlog
+  1-2-knowledge-base-pipeline-clean-dedup-chunk-and-stats: in-progress
   1-3-baseline-retrieval-bm25-dense-rrf-hybrid: backlog
   1-4-eval-harness-v1-retrieval-metrics-from-qrels: backlog
   1-5-retrieval-innovations-rerank-query-rewrite-section-aware-wei: backlog
