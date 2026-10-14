@@ -60,14 +60,14 @@ context:
 | I-3 | Build config defaults (band 256–512, overlap 15%, filter `cs.*`, contingency 12k, estimator ×4/3) | Single-sourced in `core.config`; unknown/override keys via CLI flags, never env vars |
 | O-1 | `data/kb/papers.jsonl` | One object/line: `arxiv_id, title, authors[], year, abstract, sections{name→text}, source_link, license, categories[]`; `source_link = https://arxiv.org/abs/<arxiv_id>`; empty `abstract`/`license` = `""`, never `null` |
 | O-2 | `data/kb/chunks.jsonl` | One object/line: `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix`; ordered by paper file order then section_rank then window index |
-| O-3 | `data/kb/kb_stats.json` | `papers, chunks, words, types, chunk_size_histogram{band→count}, year_min, year_max, year_histogram{year→count}, category_composition{cs_papers, aiml_papers, total}, provenance{source_url, filter_mode, filter_widened, dropped_no_metadata, duplicates, malformed_source_lines, malformed_metadata_lines, non_english_dropped, generated_at}` |
+| O-3 | `data/kb/kb_stats.json` | `papers, chunks, words, types, chunk_size_histogram{band→count}, year_min, year_max, year_histogram{year→count}, category_composition{cs_papers, aiml_papers, total}, provenance{source_url, metadata_url, filter_mode, filter_widened, dropped_no_metadata, duplicates, malformed_source_lines, malformed_metadata_lines, non_english_dropped, generated_at}` |
 | E-1 | Paper has no metadata row | Dropped, `dropped_no_metadata++`; never emitted with nulls |
 | E-2 | Dataset id pre-2007 slash-less (`nlin0608019`) | Re-slash before join (`nlin/0608019`); join succeeds |
 | E-3 | Metadata id versioned (`0704.0001v2`) | Suffix stripped; join keyed on bare id |
 | E-4 | cs.* yield < 12,000 pre-clean | Widen to all categories; `filter_widened: true`; composition reported either way |
 | E-5 | Two papers with identical normalized full text | SHA-256 content dedup pre-chunking; first in file order kept; `duplicates++` |
 | E-6 | Non-English paper (heuristic) | Dropped at clean; `non_english_dropped++` |
-| E-7 | Paper with empty `section_names[]` | Whole `article_text` becomes one section named `body`, `section_rank 0` |
+| E-7 | Paper with empty `section_names[]` | Whole `article_text` becomes one section named `body` (joined); ranked per E-18 |
 | E-8 | Empty/whitespace section text | No chunk emitted for it |
 | E-9 | Missing/empty abstract | No abstract chunk; `abstract` field = `""` in papers.jsonl (not a null-metadata drop) |
 | E-10 | Section > 512 tokens | Windowed split, step = floor(512 × 0.85); last window < 128 tokens folds into the previous window |
@@ -123,6 +123,8 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 ## Spec Change Log
 
 - 2026-10-14: Initial frozen block from project spec CAP-1 + stories.yaml story 2 + pipeline-stages schemas + stack.md acquisition + spine AD-1/2/5 (bmad-spec, in-session fallback per loop §0.5).
+- 2026-10-14: Pre-build amendment — `provenance.metadata_url` added to O-3 (reproducibility; nothing has consumed the matrix yet). KEEP: provenance fields are exhaustive — every drop/dup/malformed path appears there.
+- 2026-10-14: Pre-build amendment — E-7 rank special case removed; body sections rank uniformly from 1 (E-18), abstract chunk alone takes rank 0. KEEP: one rank rule, dataset section order.
 
 ## Design Notes
 
