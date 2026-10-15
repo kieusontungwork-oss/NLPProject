@@ -1,7 +1,7 @@
 ---
 story: '1.2'
 slug: kb-pipeline
-status: review
+status: done
 baseline_commit: 7a3dc5704cf848f97d1608edd3ed2504d4b6d8ee
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-NLPProject-2026-10-12/ARCHITECTURE-SPINE.md
@@ -190,3 +190,7 @@ Full-corpus `build` (train + val + test members, local files from `data/raw/`), 
 3. `src/paperpilot/kb/cli.py` — `run_build_command`, `build` (try/finally around the index)
 4. `src/paperpilot/kb/clean.py` — `is_boilerplate`
 5. `src/paperpilot/kb/stats.py` — `CorpusAggregate`, `render_stats`
+
+## GitHub Links
+
+- PR: #2

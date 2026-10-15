@@ -38,3 +38,11 @@ Full invariants live in the spine (AD-1…AD-6) — this digest condenses; the s
 ## Stack pins (spine Stack table; `uv.lock` is the authority)
 - Python 3.11+ (uv); pydantic 2.14.1; sentence-transformers 6.1.0; faiss-cpu 1.15.1; rank-bm25 0.2.2; ir-measures 0.4.3; ragas 0.4.3; streamlit 1.65.0; HF `armanc/scientific_papers` arxiv split + `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json` join (pre-2007 ids re-slash).
 - No orchestration frameworks; Ollama only local server; keys from git-ignored `.env`.
+
+## Patterns minted by story 1.2 (binding for later stories)
+- Writes are atomic: tmp file + `os.replace`; rebuilds wholesale, never in-place appends.
+- Every drop/dup/malformed path gets a named provenance counter; nothing is silently discarded.
+- CLI `run_<x>_command` catches unexpected exceptions → exit 3 (never raises); stage errors carry offending values.
+- Mid-build contract changes need owner approval and a dated Spec Change Log entry with a "KEEP:" line.
+- House spec ends with an "Acceptance run record" on the real corpus (figures + peak RSS).
+- Real KB (cs.*, train+val+test): 12,350 papers, 271,171 chunks (max 561 tokens), years 1994–2017; build peak RSS ~2.6GB.
