@@ -1,4 +1,4 @@
-"""Metadata stage: arXiv snapshot index, id repair, join, cs.* filter with widening (E-1..E-4, E-17).
+"""Metadata stage: arXiv snapshot index, id repair, join, cs.* filter with widening (E-1..E-4, E-17, E-19).
 
 Story 1.2 · CAP-1. The 4.5GB snapshot streams into a temp sqlite table (stdlib)
 keyed by bare arxiv_id so the join needs bounded RAM (Design Notes). The sqlite
@@ -13,7 +13,6 @@ import logging
 import re
 import sqlite3
 from collections.abc import Iterator
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from paperpilot.core.config import KBDefaults
@@ -26,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 _NEW_STYLE_ID = re.compile(r"^\d{4}\.\d{4,5}(v\d+)?$")
 _PRE_2007_ID = re.compile(r"^([a-z\-]+)(\d{7})$")
+_YEAR_NEW_ID = re.compile(r"^(\d{2})(\d{2})\.\d{4,5}$")
+_YEAR_OLD_ID = re.compile(r"^[a-z\-]+(?:\.[A-Za-z]{2})?/(\d{2})(\d{2})\d{3}$")
 _VERSION_SUFFIX = re.compile(r"v\d+$")
 
 BODY_FALLBACK_SECTION = "body"
@@ -58,19 +59,32 @@ def bare_metadata_id(raw_id: str) -> str:
     return _VERSION_SUFFIX.sub("", raw_id)
 
 
-def split_categories(categories: str) -> list[str]:
-    """Snapshot categories are one space-separated string (E-17)."""
-    return categories.split()
+def split_categories(categories: str | list) -> list[str]:
+    """Snapshot categories: a one-element list of a space-separated string, or a plain string (E-17)."""
+    if isinstance(categories, str):
+        return categories.split()
+    if isinstance(categories, list):
+        return " ".join(str(c) for c in categories).split()
+    raise ValueError(f"categories must be str or list, got {type(categories).__name__}")
 
 
-def parse_year(created: str | None) -> int | None:
-    """Year from versions[0].created (e.g. 'Mon, 2 Apr 2007 19:30:00 GMT'); None if unparseable."""
-    if not created:
-        return None
-    try:
-        return parsedate_to_datetime(created).year
-    except (TypeError, ValueError):
-        return None
+def year_from_arxiv_id(arxiv_id: str) -> int | None:
+    """First-submission year derived from a bare arxiv id (E-19); None if the id is unparseable.
+
+    New-style YYMM.NNNN(N) -> 2000+YY; old-style archive[.SUB]/YYMMNNN -> 19YY if YY >= 91 else 20YY.
+    MM outside 01-12 -> None.
+    """
+    match = _YEAR_NEW_ID.match(arxiv_id)
+    if match:
+        yy, mm = int(match.group(1)), int(match.group(2))
+        return 2000 + yy if 1 <= mm <= 12 else None
+    match = _YEAR_OLD_ID.match(arxiv_id)
+    if match:
+        yy, mm = int(match.group(1)), int(match.group(2))
+        if not 1 <= mm <= 12:
+            return None
+        return 1900 + yy if yy >= 91 else 2000 + yy
+    return None
 
 
 def _parse_authors(raw: str) -> list[str]:
@@ -95,27 +109,28 @@ def build_metadata_index(
                     continue
                 try:
                     record = json.loads(line)
-                    raw_id = record["id"]
-                    title = record["title"]
-                    categories = record["categories"]
-                except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                    raw_id = str(record["id"])
+                    title = str(record["title"])
+                    categories = split_categories(record["categories"])
+                    if not raw_id or not title:
+                        raise ValueError("empty id or title")
+                    bare_id = bare_metadata_id(raw_id)
+                    conn.execute(
+                        "INSERT OR REPLACE INTO metadata VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            bare_id,
+                            title,
+                            json.dumps(_parse_authors(str(record.get("authors", "")))),
+                            year_from_arxiv_id(bare_id),
+                            str(record.get("abstract", "")),
+                            str(record.get("license") or ""),
+                            json.dumps(categories),
+                        ),
+                    )
+                except (json.JSONDecodeError, KeyError, TypeError, ValueError, sqlite3.Error) as exc:
                     counters.malformed_metadata_lines += 1
                     logger.warning("malformed metadata line skipped: %s", exc)
                     continue
-                versions = record.get("versions") or []
-                created = versions[0].get("created") if versions else None
-                conn.execute(
-                    "INSERT OR REPLACE INTO metadata VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        bare_metadata_id(raw_id),
-                        title,
-                        json.dumps(_parse_authors(str(record.get("authors", "")))),
-                        parse_year(created),
-                        str(record.get("abstract", "")),
-                        str(record.get("license") or ""),
-                        json.dumps(split_categories(str(categories))),
-                    ),
-                )
         conn.commit()
     finally:
         conn.close()
@@ -153,27 +168,37 @@ def category_in_scope(categories: list[str], defaults: KBDefaults, mode: str) ->
 def join_paper(
     record: dict,
     db_path: Path,
+    counters: BuildCounters,
 ) -> Paper | None:
-    """Join one parsed source record against the index; None = drop (E-1 / year rule).
+    """Join one parsed source record against the index; None = drop (E-1 / unusable metadata).
 
     Abstract comes from the source's `abstract_text[]` (the join fills only
     title/authors/year/categories/license per stack.md). E-7 fallback lives here:
     empty section_names[] folds article_text[] into one `body` section. Emits
-    Paper only when metadata is complete (never nulls).
+    Paper only when metadata is complete — empty title/authors/categories are
+    unusable metadata and drop the paper (never nulls). Nameless sections are
+    skipped and counted; section names colliding after normalization merge
+    (last wins) and are counted.
     """
     arxiv_id = bare_dataset_id(str(record["article_id"]))
     row = lookup_metadata(db_path, arxiv_id)
     if row is None:
         return None
     title, authors, year, _abstract, license, categories = row
-    if not categories:
-        return None  # no scoping or composition possible; counts as unusable metadata
+    if not categories or not authors or not normalize(title):
+        return None  # no scoping, composition, or citation target possible
 
     section_names = [normalize(str(n)) for n in record.get("section_names") or []]
     section_bodies = [_join_pieces(s) for s in record.get("sections") or []]
-    if section_names:
-        sections = dict(zip(section_names, section_bodies, strict=False))
-    else:
+    sections: dict[str, str] = {}
+    for name, body in zip(section_names, section_bodies, strict=False):
+        if not name:
+            counters.nameless_sections_dropped += 1
+            continue
+        if name in sections:
+            counters.sections_merged_name_collision += 1
+        sections[name] = body
+    if not section_names:
         body = _join_pieces(record.get("article_text") or "")
         sections = {BODY_FALLBACK_SECTION: body} if body else {}
     abstract = _join_pieces(record.get("abstract_text") or [])
@@ -207,7 +232,7 @@ def count_in_scope(
     """Pass A: count cs.*-scoped joins to decide widening (E-4) before emitting anything."""
     cs_yield = 0
     for record in records:
-        paper = join_paper(record, db_path)
+        paper = join_paper(record, db_path, counters)
         if paper is None:
             continue
         if category_in_scope(paper.categories, defaults, "cs"):
@@ -236,7 +261,7 @@ def iter_scope(
 ) -> Iterator[Paper]:
     """Pass B: join + drop (counting E-1 and year failures) + scope filter, in source order."""
     for record in records:
-        paper = join_paper(record, db_path)
+        paper = join_paper(record, db_path, counters)
         if paper is None:
             counters.dropped_no_metadata += 1
             continue

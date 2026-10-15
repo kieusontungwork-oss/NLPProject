@@ -17,7 +17,7 @@ class Paper(BaseModel):
 
     arxiv_id: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    authors: list[str]
+    authors: list[str] = Field(min_length=1)
     year: int
     abstract: str = ""
     sections: dict[str, str]
@@ -55,9 +55,13 @@ class Provenance(BaseModel):
     filter_widened: bool = False
     dropped_no_metadata: int = Field(ge=0)
     duplicates: int = Field(ge=0)
+    duplicate_chunks: int = Field(ge=0)
     malformed_source_lines: int = Field(ge=0)
     malformed_metadata_lines: int = Field(ge=0)
     non_english_dropped: int = Field(ge=0)
+    boilerplate_sections_stripped: int = Field(ge=0)
+    nameless_sections_dropped: int = Field(ge=0)
+    sections_merged_name_collision: int = Field(ge=0)
     generated_at: str
 
 

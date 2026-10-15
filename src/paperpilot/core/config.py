@@ -11,12 +11,13 @@ from dataclasses import dataclass
 
 S3_SOURCE_URL = "https://s3.amazonaws.com/datasets.huggingface.co/scientific_papers/1.1.1/arxiv-dataset.zip"
 GCS_METADATA_URL = "https://storage.googleapis.com/arxiv-dataset/metadata-v5/arxiv-metadata-oai.json"
-SOURCE_MEMBER = "arxiv-dataset/train.txt"
+# Fixed order: determinism (E-16).
+SOURCE_MEMBERS: tuple[str, ...] = ("arxiv-dataset/train.txt", "arxiv-dataset/val.txt", "arxiv-dataset/test.txt")
 
 
 @dataclass(frozen=True)
 class KBDefaults:
-    """Frozen defaults for the KB build (I-3 of the house spec)."""
+    """Frozen defaults for the KB build (I-3 of the house spec); validated at construction."""
 
     token_floor: int = 256
     token_ceiling: int = 512
@@ -29,6 +30,26 @@ class KBDefaults:
         {"cs.AI", "cs.CL", "cs.LG", "cs.CV", "cs.IR", "stat.ML"}
     )
     category_prefix: str = "cs."
+
+    def __post_init__(self) -> None:
+        if 0 >= self.token_floor or self.token_floor >= self.token_ceiling:
+            raise ValueError(
+                f"token band invalid: floor={self.token_floor} ceiling={self.token_ceiling} (need 0 < floor < ceiling)"
+            )
+        if not 0 < self.overlap_fraction < 1:
+            raise ValueError(f"overlap_fraction={self.overlap_fraction} must be in (0, 1)")
+        if self.step_words <= 0:
+            raise ValueError(
+                f"step_words={self.step_words} (overlap {self.overlap_fraction}) would loop forever"
+            )
+        if 0 >= self.fold_floor_tokens or self.fold_floor_tokens >= self.token_floor:
+            raise ValueError(
+                f"fold_floor_tokens={self.fold_floor_tokens} must be in (0, token_floor={self.token_floor})"
+            )
+        if self.widen_threshold <= 0:
+            raise ValueError(f"widen_threshold={self.widen_threshold} must be positive")
+        if not 0 < self.ascii_letter_share <= 1:
+            raise ValueError(f"ascii_letter_share={self.ascii_letter_share} must be in (0, 1]")
 
     @property
     def max_window_words(self) -> int:

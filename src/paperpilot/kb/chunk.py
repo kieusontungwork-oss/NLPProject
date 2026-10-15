@@ -2,7 +2,10 @@
 
 Story 1.2 · CAP-1 · pipeline-stages.md "Chunking design" (graded design choice).
 Windows are word-based: the estimator (words x 4/3, core.config) maps the token
-band onto word windows, so no model tokenizer is needed at KB time.
+band onto word windows, so no model tokenizer is needed at KB time. The band
+governs regular windows; a folded tail (E-10) may exceed the ceiling by up to
+fold_floor tokens — a small orphan chunk would serve retrieval worse (Design
+Notes; embedders truncate at their model window regardless).
 """
 
 from __future__ import annotations

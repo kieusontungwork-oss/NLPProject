@@ -16,7 +16,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from urllib.request import urlopen
 
-from paperpilot.core.config import SOURCE_MEMBER, S3_SOURCE_URL
+from paperpilot.core.config import SOURCE_MEMBERS, S3_SOURCE_URL
 from paperpilot.core.errors import KBStageError
 from paperpilot.kb.stats import BuildCounters
 
@@ -43,11 +43,19 @@ def download_file(
     opener = transport if transport is not None else _default_transport
     try:
         with opener(url) as response, tmp.open("wb") as out:
+            expected = _content_length(response)
+            written = 0
             while True:
                 block = response.read(_CHUNK)
                 if not block:
                     break
+                written += len(block)
                 out.write(block)
+        if expected is not None and written != expected:
+            raise KBStageError(
+                "acquire",
+                f"download truncated: wrote {written} bytes, server declared {expected} for {url}",
+            )
         os.replace(tmp, dest)
     except KBStageError:
         tmp.unlink(missing_ok=True)
@@ -66,39 +74,59 @@ def _default_transport(url: str) -> io.BufferedReader:
         raise KBStageError("acquire", f"cannot open {url}: {exc}") from exc
 
 
+def _content_length(response: object) -> int | None:
+    """Server-declared byte count when the transport exposes headers; None otherwise."""
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    raw = headers.get("Content-Length")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def iter_source_records(
     zip_path: Path,
     counters: BuildCounters,
     limit: int | None = None,
-    member: str = SOURCE_MEMBER,
+    members: tuple[str, ...] = SOURCE_MEMBERS,
 ) -> Iterator[dict]:
-    """Stream-parse the JSONL member line-by-line (bounded RAM); malformed lines skip + count.
+    """Stream-parse the JSONL members (I-1: train, val, test) as ONE record stream, in order.
 
-    `limit` stops after N *valid* records (E-16 smoke slices), not N lines.
+    Line-by-line (bounded RAM); malformed lines skip + count. `limit` stops after N
+    *valid* records across the whole stream (E-16 smoke slices), not N lines.
     """
+    emitted = 0
     try:
         with zipfile.ZipFile(zip_path) as archive:
-            with archive.open(member) as raw:
-                handle = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
-                emitted = 0
-                for line in handle:
-                    if limit is not None and emitted >= limit:
-                        return
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        record = json_record(line)
-                    except (ValueError, KeyError, TypeError) as exc:
-                        counters.malformed_source_lines += 1
-                        logger.warning("malformed source line skipped: %s", exc)
-                        continue
-                    emitted += 1
-                    yield record
+            for member in members:
+                try:
+                    raw = archive.open(member)
+                except KeyError as exc:
+                    raise KBStageError("acquire", f"cannot read {member} from {zip_path}: {exc}") from exc
+                with raw:
+                    handle = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
+                    for line in handle:
+                        if limit is not None and emitted >= limit:
+                            return
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            record = json_record(line)
+                        except (ValueError, KeyError, TypeError) as exc:
+                            counters.malformed_source_lines += 1
+                            logger.warning("malformed source line skipped: %s", exc)
+                            continue
+                        emitted += 1
+                        yield record
     except KBStageError:
         raise
-    except (zipfile.BadZipFile, KeyError) as exc:
-        raise KBStageError("acquire", f"cannot read {member} from {zip_path}: {exc}") from exc
+    except zipfile.BadZipFile as exc:
+        raise KBStageError("acquire", f"cannot read {zip_path}: {exc}") from exc
 
 
 def json_record(line: str) -> dict:

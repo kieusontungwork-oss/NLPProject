@@ -1,7 +1,7 @@
 ---
 story: '1.2'
 slug: kb-pipeline
-status: in-progress
+status: review
 baseline_commit: 7a3dc5704cf848f97d1608edd3ed2504d4b6d8ee
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-NLPProject-2026-10-12/ARCHITECTURE-SPINE.md
@@ -24,13 +24,13 @@ context:
 
 - `chunk_id` is minted ONLY by `paperpilot.core.ids.chunk_id(arxiv_id, section_name, text)`: leading 16 hex of SHA-1 over UTF-8 `arxiv_id + "\x1f" + section_name + "\x1f" + normalize(text)`; `normalize` = NFC + whitespace collapse (AD-2). Stored chunk `text` is the normalized text.
 - Artifact classes (AD-5): this story writes only class 2 (`data/raw/`, `data/kb/`); never writes `data/eval/` (class 1), `indexes/`, or `reports/` (class 3). Outputs atomic: tmp file + `os.replace`; rebuilds are wholesale.
-- Bounded RAM: stream `train.txt` (3.5GB) and the metadata JSONL (4.5GB) line-by-line; the metadata join index lives on disk (stdlib `sqlite3` temp table), never a full in-RAM dict.
+- Bounded RAM: stream the source members (`train.txt` 14.3GB uncompressed + `val.txt` + `test.txt`) and the metadata JSONL (4.5GB) line-by-line; the metadata join index lives on disk (stdlib `sqlite3` temp table), never a full in-RAM dict.
 - No paper emitted with null `title`/`authors`/`year`/`categories`; a paper with no metadata row is dropped + counted (`dropped_no_metadata`).
 - English-only: clean drops non-English papers via a documented heuristic; counted (`non_english_dropped`).
 - cs.* filter (any `cs.*` category) applied via the metadata join; if pre-clean yield < 12,000, widen to all categories, set `provenance.filter_widened: true`.
 - Offline tests: `uv run pytest tests/ -q` green with no network; synthetic fixtures only.
 - Bootstrap: `pyproject.toml` + committed `uv.lock`; runtime dep `pydantic==2.14.1`; dev deps `pytest`, `pyyaml`. No other deps. Python 3.11+ via uv (`.venv/` at repo root).
-- Ids re-slashed pre-2007 (`nlin0608019` → `nlin/0608019`) and metadata ids stripped of version suffix (`0704.0001v2` → `0704.0001`) before matching. `year` = year parsed from metadata `versions[0].created`; unparseable → drop + count.
+- Ids re-slashed pre-2007 (`nlin0608019` → `nlin/0608019`) and metadata ids stripped of version suffix (`0704.0001v2` → `0704.0001`) before matching. `year` = first-submission year derived from the bare `arxiv_id` (new-style `YYMM.NNNNN` → `2000+YY`; pre-2007 `archive/YYMMNNN` → `19YY` if `YY ≥ 91` else `20YY`); unparseable id → drop + count (E-19).
 - Import direction (AD-1): `kb` imports only `core`; `core` imports nothing from `kb`.
 - Malformed JSONL lines (source or metadata): skip + count + warn; never crash the build.
 - CLI: argparse subcommand `build`, `run_build_command(...) -> int` never raises; exit 0 success / 1 verification failure / 3 stage error; `--limit N` flag for smoke slices; summary on stdout, errors on stderr.
@@ -55,8 +55,8 @@ context:
 
 | # | Input / trigger | Expected behavior |
 | --- | --- | --- |
-| I-1 | S3 zip `https://s3.amazonaws.com/datasets.huggingface.co/scientific_papers/1.1.1/arxiv-dataset.zip`, member `train.txt` (JSONL: `article_id`, `article_text[]`, `abstract_text[]`, `sections[][]`, `section_names[]`) | Streamed download to `data/raw/`; parsed line-by-line; raw artifact is class 2 |
-| I-2 | Metadata JSONL `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json` (4.5GB; `id` versioned, `categories` space-separated string, `title`, `authors`, `abstract`, `versions[].created`, `license`) | Streamed into a temp sqlite index keyed by suffix-stripped id; deleted after the build |
+| I-1 | S3 zip `https://s3.amazonaws.com/datasets.huggingface.co/scientific_papers/1.1.1/arxiv-dataset.zip`, members `train.txt`, `val.txt`, `test.txt`, read in that fixed order as one record stream (JSONL: `article_id`, `article_text[]`, `abstract_text[]`, `sections[][]`, `section_names[]`) | Streamed download to `data/raw/`; parsed line-by-line; raw artifact is class 2 |
+| I-2 | Metadata JSONL `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json` (4.5GB; `id` versioned, `categories` a one-element list holding a space-separated string (`["cs.AI stat.ML"]`), `title`, `authors` (free-text string), `abstract`, `versions` a list of bare version strings (`["v1","v2"]`, no dates); no `license` key) | Streamed into a temp sqlite index keyed by suffix-stripped id; deleted after the build |
 | I-3 | Build config defaults (band 256–512, overlap 15%, filter `cs.*`, contingency 12k, estimator ×4/3) | Single-sourced in `core.config`; unknown/override keys via CLI flags, never env vars |
 | O-1 | `data/kb/papers.jsonl` | One object/line: `arxiv_id, title, authors[], year, abstract, sections{name→text}, source_link, license, categories[]`; `source_link = https://arxiv.org/abs/<arxiv_id>`; empty `abstract`/`license` = `""`, never `null` |
 | O-2 | `data/kb/chunks.jsonl` | One object/line: `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix`; ordered by paper file order then section_rank then window index |
@@ -77,8 +77,9 @@ context:
 | E-14 | Interrupted rebuild | Tmp files never promoted; next run rebuilds wholesale; no partial data/kb artifacts |
 | E-15 | Network failure mid-download | Exit 3, clear stderr message; no `data/kb/` outputs written |
 | E-16 | `--limit N` smoke run | Deterministic first-N slice; two identical invocations produce identical chunk_id sequences |
-| E-17 | Metadata `categories` space-separated (`"cs.AI stat.ML"`) | Split on whitespace; cs.* test = any token startswith `cs.`; AI/ML/NLP set = {`cs.AI`,`cs.CL`,`cs.LG`,`cs.CV`,`cs.IR`,`stat.ML`} (composition stat only) |
+| E-17 | Metadata `categories` a one-element list of a space-separated string (`["cs.AI stat.ML"]`; a plain string is accepted too) | Join list elements with a space, then split on whitespace; cs.* test = any token startswith `cs.`; AI/ML/NLP set = {`cs.AI`,`cs.CL`,`cs.LG`,`cs.CV`,`cs.IR`,`stat.ML`} (composition stat only) |
 | E-18 | Abstract vs sections duplication | Abstract chunk emitted from `abstract_text` even though sections may repeat it; `section_name = "abstract"`, `section_rank 0`, body sections ranked from 1 |
+| E-19 | Metadata `versions` carry no dates (`["v1","v2"]`); no `license` key | `year` derived from the bare `arxiv_id` (`0704.0001` → 2007, `hep-th/9901001` → 1999, `math/0211159` → 2002); unparseable id → drop + `dropped_no_metadata++`; `license = ""` |
 
 </frozen-after-approval>
 
@@ -91,7 +92,7 @@ Makefile                         # `kb` target -> uv run python -m paperpilot.kb
 src/paperpilot/core/ids.py       # normalize(), chunk_id() — the only hasher (AD-2)
 src/paperpilot/core/schemas.py   # Paper, Chunk, KBStats pydantic models (no-null validation)
 src/paperpilot/core/config.py    # KBDefaults: band, overlap, filter, contingency, estimator (single-sourced)
-src/paperpilot/kb/acquire.py     # S3 zip download to data/raw/ + stream parse of train.txt
+src/paperpilot/kb/acquire.py     # S3 zip download to data/raw/ + stream parse of train/val/test
 src/paperpilot/kb/metadata.py    # stream metadata -> sqlite index; re-slash; join + cs.* filter (+widening)
 src/paperpilot/kb/clean.py       # boilerplate strip (by section name), English heuristic, NFC/whitespace normalize
 src/paperpilot/kb/dedup.py       # SHA-256 content-hash dedup, keep-first
@@ -109,7 +110,7 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 3. **core.schemas** — Paper/Chunk/KBStats models. AC: null metadata raises; O-1/O-2/O-3 field-exact.
 4. **core.config** — defaults single-sourced. AC: I-3.
 5. **kb.acquire** — download + stream parse. AC: I-1; E-14/E-15 (synthetic zip fixture; failure path via monkeypatched transport).
-6. **kb.metadata** — index + join + filter + widening. AC: E-1, E-2, E-3, E-4, E-17; year from `versions[0].created`, unparseable → drop + count.
+6. **kb.metadata** — index + join + filter + widening. AC: E-1, E-2, E-3, E-4, E-17, E-19; year from the bare `arxiv_id`, unparseable → drop + count.
 7. **kb.clean** — boilerplate strip, English heuristic, normalization. AC: E-6, E-12; boilerplate section names (references/appendix/acknowledgments) stripped, counted.
 8. **kb.dedup** — content-hash keep-first. AC: E-5.
 9. **kb.chunk** — split + windows + abstract + header_prefix. AC: E-7..E-11, E-13, E-18.
@@ -125,6 +126,8 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 - 2026-10-14: Initial frozen block from project spec CAP-1 + stories.yaml story 2 + pipeline-stages schemas + stack.md acquisition + spine AD-1/2/5 (bmad-spec, in-session fallback per loop §0.5).
 - 2026-10-14: Pre-build amendment — `provenance.metadata_url` added to O-3 (reproducibility; nothing has consumed the matrix yet). KEEP: provenance fields are exhaustive — every drop/dup/malformed path appears there.
 - 2026-10-14: Pre-build amendment — E-7 rank special case removed; body sections rank uniformly from 1 (E-18), abstract chunk alone takes rank 0. KEEP: one rank rule, dataset section order.
+- 2026-10-15: Mid-build amendment (owner-approved, Option A) — the real `metadata-v5` snapshot has `versions` as bare strings (no `created` date), `categories` as a one-element list, and no `license` key (found by the first full-corpus `make kb`, which crashed in `build_metadata_index`). `year` is now derived from the bare `arxiv_id` (E-19); categories list is joined then split (E-17); missing license = `""`. Rejected: switching to the Kaggle snapshot (needs per-teammate auth, unpinned weekly updates). KEEP: one year rule (from the id), no network/auth beyond the two public URLs.
+- 2026-10-15: Mid-build amendment (owner-approved) — measured cs.* yield is 5.7%, not the spike's 7.5% (15/200 sample): `train.txt` alone joins 11,512 cs.* papers (< 12k → widen to all 203,037 papers → OOM at 23.7GB RSS and ~4.3M chunks, outside the 190k–380k band). I-1 now reads all three zip members (`train`, `val`, `test`; 215,913 papers, 12,352 cs.* — clears 12k pre-clean); held-out splits carry no meaning for this KB (no model is trained on them). Threshold and filter policy unchanged. Measured peak RSS: 0.23GB at 1,000 papers (~3GB projected for the cs.* KB). KEEP: fixed member order train→val→test (determinism, E-16); widening rule unchanged.
 
 ## Design Notes
 
@@ -140,6 +143,17 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 1. `uv sync && uv run pytest tests/ -q` — all green, offline, on synthetic fixtures.
 2. `uv run python -m paperpilot.kb.cli build --limit 200 --data-dir /tmp/opencode/kb-smoke` — twice; `diff` of the two chunks.jsonl chunk_id sequences is empty (E-16).
 3. `make kb` (full corpus) — `kb_stats.json`: `papers ≥ 10000`, `words ≥ 100000`, `chunks` in 190k–380k ballpark, `dropped_no_metadata` small and documented, zero papers with null metadata (schema-enforced). Figures recorded in the story report.
+
+### Acceptance run record (task 11, 2026-10-15)
+
+Full-corpus `build` (train + val + test members, local files from `data/raw/`), `filter=cs`, `filter_widened=false`. Peak RSS observed 2,616,356 kB (~2.6 GB). Figures copied from `data/kb/kb_stats.json`:
+
+- papers = 12350; chunks = 273332; words = 96895756; types = 902454; year_min = 1994; year_max = 2017
+- category_composition: cs_papers = 12350, aiml_papers = 2741, total = 12350
+- chunk_size_histogram: 0-128 = 2822, 129-255 = 27222, 256-384 = 25850, 385-512 = 209971, 513+ = 7467
+- provenance: dropped_no_metadata = 0, duplicates = 2, duplicate_chunks = 285, malformed_source_lines = 0, malformed_metadata_lines = 0, non_english_dropped = 0, boilerplate_sections_stripped = 4447, nameless_sections_dropped = 191, sections_merged_name_collision = 22, filter_mode = cs, filter_widened = false
+- Null check on `papers.jsonl`: 12350 records, 0 with a null/empty title, authors, year, or categories.
+- Smoke (`--limit 200`, run twice): chunk_id sequences identical (4217 chunks each).
 
 ## Suggested Review Order
 
