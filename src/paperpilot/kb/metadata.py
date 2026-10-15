@@ -89,7 +89,9 @@ def year_from_arxiv_id(arxiv_id: str) -> int | None:
 
 def _parse_authors(raw: str) -> list[str]:
     """Snapshot authors are free text with ', ' / ' and ' separators; split deterministically."""
-    return [a.strip() for a in raw.replace(" and ", ", ").split(", ") if a.strip()]
+    text = re.sub(r"\([^)]*\)", "", " ".join(raw.split()))
+    names = (n.strip(" ,") for n in re.split(r",\s*|\s+and\s+", text))
+    return [n[4:].strip() if n.startswith("and ") else n for n in names if n]
 
 
 def build_metadata_index(
@@ -99,15 +101,16 @@ def build_metadata_index(
 ) -> None:
     """Stream the snapshot JSONL into a sqlite index (I-2); malformed lines skip + count."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
+    db_path.unlink(missing_ok=True)  # always rebuild from scratch: never reuse a stale index
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(_SCHEMA)
-        with metadata_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if not line:
+        with metadata_path.open("rb") as handle:
+            for raw_line in handle:
+                if not raw_line.strip():
                     continue
                 try:
+                    line = raw_line.decode("utf-8")  # strict: bad bytes -> UnicodeDecodeError (a ValueError)
                     record = json.loads(line)
                     raw_id = str(record["id"])
                     title = str(record["title"])
@@ -178,7 +181,7 @@ def join_paper(
     Paper only when metadata is complete — empty title/authors/categories are
     unusable metadata and drop the paper (never nulls). Nameless sections are
     skipped and counted; section names colliding after normalization merge
-    (last wins) and are counted.
+    (concatenated in order) and are counted.
     """
     arxiv_id = bare_dataset_id(str(record["article_id"]))
     row = lookup_metadata(db_path, arxiv_id)
@@ -197,8 +200,10 @@ def join_paper(
             continue
         if name in sections:
             counters.sections_merged_name_collision += 1
-        sections[name] = body
-    if not section_names:
+            sections[name] = sections[name] + " " + body
+        else:
+            sections[name] = body
+    if not sections:
         body = _join_pieces(record.get("article_text") or "")
         sections = {BODY_FALLBACK_SECTION: body} if body else {}
     abstract = _join_pieces(record.get("abstract_text") or [])

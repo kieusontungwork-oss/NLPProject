@@ -24,7 +24,7 @@ context:
 
 - `chunk_id` is minted ONLY by `paperpilot.core.ids.chunk_id(arxiv_id, section_name, text)`: leading 16 hex of SHA-1 over UTF-8 `arxiv_id + "\x1f" + section_name + "\x1f" + normalize(text)`; `normalize` = NFC + whitespace collapse (AD-2). Stored chunk `text` is the normalized text.
 - Artifact classes (AD-5): this story writes only class 2 (`data/raw/`, `data/kb/`); never writes `data/eval/` (class 1), `indexes/`, or `reports/` (class 3). Outputs atomic: tmp file + `os.replace`; rebuilds are wholesale.
-- Bounded RAM: stream the source members (`train.txt` 14.3GB uncompressed + `val.txt` + `test.txt`) and the metadata JSONL (4.5GB) line-by-line; the metadata join index lives on disk (stdlib `sqlite3` temp table), never a full in-RAM dict.
+- Bounded RAM: stream the source members (`train.txt` 14.3GB uncompressed + `val.txt` + `test.txt`) and the metadata JSONL (4.5GB) line-by-line; the metadata join index lives on disk (stdlib `sqlite3` temp table), never a full in-RAM dict. Output lists are held in RAM for the cs.* KB (measured peak 2.6GB); streaming emission for the widening path is deferred (deferred-work.md).
 - No paper emitted with null `title`/`authors`/`year`/`categories`; a paper with no metadata row is dropped + counted (`dropped_no_metadata`).
 - English-only: clean drops non-English papers via a documented heuristic; counted (`non_english_dropped`).
 - cs.* filter (any `cs.*` category) applied via the metadata join; if pre-clean yield < 12,000, widen to all categories, set `provenance.filter_widened: true`.
@@ -60,7 +60,7 @@ context:
 | I-3 | Build config defaults (band 256–512, overlap 15%, filter `cs.*`, contingency 12k, estimator ×4/3) | Single-sourced in `core.config`; unknown/override keys via CLI flags, never env vars |
 | O-1 | `data/kb/papers.jsonl` | One object/line: `arxiv_id, title, authors[], year, abstract, sections{name→text}, source_link, license, categories[]`; `source_link = https://arxiv.org/abs/<arxiv_id>`; empty `abstract`/`license` = `""`, never `null` |
 | O-2 | `data/kb/chunks.jsonl` | One object/line: `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix`; ordered by paper file order then section_rank then window index |
-| O-3 | `data/kb/kb_stats.json` | `papers, chunks, words, types, chunk_size_histogram{band→count}, year_min, year_max, year_histogram{year→count}, category_composition{cs_papers, aiml_papers, total}, provenance{source_url, metadata_url, filter_mode, filter_widened, dropped_no_metadata, duplicates, malformed_source_lines, malformed_metadata_lines, non_english_dropped, generated_at}` |
+| O-3 | `data/kb/kb_stats.json` | `papers, chunks, words, types, chunk_size_histogram{band→count}, year_min, year_max, year_histogram{year→count}, category_composition{cs_papers, aiml_papers, total}, provenance{source_url, metadata_url, filter_mode, filter_widened, dropped_no_metadata, duplicates, malformed_source_lines, malformed_metadata_lines, non_english_dropped, duplicate_chunks, boilerplate_sections_stripped, nameless_sections_dropped, sections_merged_name_collision, generated_at}`; words/types counted over paper text (abstract + sections), not chunk text |
 | E-1 | Paper has no metadata row | Dropped, `dropped_no_metadata++`; never emitted with nulls |
 | E-2 | Dataset id pre-2007 slash-less (`nlin0608019`) | Re-slash before join (`nlin/0608019`); join succeeds |
 | E-3 | Metadata id versioned (`0704.0001v2`) | Suffix stripped; join keyed on bare id |
@@ -70,10 +70,10 @@ context:
 | E-7 | Paper with empty `section_names[]` | Whole `article_text` becomes one section named `body` (joined); ranked per E-18 |
 | E-8 | Empty/whitespace section text | No chunk emitted for it |
 | E-9 | Missing/empty abstract | No abstract chunk; `abstract` field = `""` in papers.jsonl (not a null-metadata drop) |
-| E-10 | Section > 512 tokens | Windowed split, step = floor(512 × 0.85); last window < 128 tokens folds into the previous window |
+| E-10 | Section > 512 tokens | Windowed split, step = floor(512 × 0.85); last window < 128 tokens folds into the previous window; n_tokens counts body words only (header prefix excluded) |
 | E-11 | Section ≤ 512 tokens | Single chunk even if < 256 (band governs splitting, not a floor for emission) |
 | E-12 | Unicode text (non-NFC, irregular whitespace) | Normalized (NFC + whitespace collapse) before hashing AND in stored `text` |
-| E-13 | chunk_id collision (identical arxiv_id+section+normalized text) | Duplicate chunk dropped + counted under `duplicates`; chunk_ids in chunks.jsonl are unique |
+| E-13 | chunk_id collision (identical arxiv_id+section+normalized text) | Duplicate chunk dropped + counted under `duplicate_chunks`; chunk_ids in chunks.jsonl are unique |
 | E-14 | Interrupted rebuild | Tmp files never promoted; next run rebuilds wholesale; no partial data/kb artifacts |
 | E-15 | Network failure mid-download | Exit 3, clear stderr message; no `data/kb/` outputs written |
 | E-16 | `--limit N` smoke run | Deterministic first-N slice; two identical invocations produce identical chunk_id sequences |
@@ -119,7 +119,34 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 
 ## Review Findings
 
-(pending — populated at Step 9 triage)
+Fresh-context review: edge-case hunter, test audit, acceptance auditor (three Sonnet subagents).
+
+- [x] [Review][Patch] P1 — E-10 fold repeated the 58 overlap words; fold now appends only words past the previous window's end (`src/paperpilot/kb/chunk.py` `_windows`)
+- [x] [Review][Patch] P2 — stale metadata index reused after a killed run; index deleted before rebuild, and `cli.build` builds/checks it inside the try/finally (`metadata.py` `build_metadata_index`, `cli.py` `build`)
+- [x] [Review][Patch] P3 — "never raises": final `except Exception` in `run_build_command` returns exit 3; metadata lines decoded as strict UTF-8, bad bytes counted as malformed (`cli.py`, `metadata.py`)
+- [x] [Review][Patch] P4 — section-name collision now concatenates (was last-wins overwrite); counter kept (`metadata.py` `join_paper`)
+- [x] [Review][Patch] P5 — E-7 `body` fallback applies whenever no named section survives (`metadata.py` `join_paper`)
+- [x] [Review][Patch] P6 — chunk text = prefix + single space + body, so stored text equals its normalized form (AD-2/E-12); chunk_ids unchanged (verified on a `--limit 200` run before/after) (`chunk.py` `chunk_text_for`)
+- [x] [Review][Patch] P7 — `words`/`types` counted over paper text (abstract + sections) in `CorpusAggregate.add_paper`, not chunk text (`stats.py`)
+- [x] [Review][Patch] P8 — boilerplate match strips a leading `[label]` and punctuation, then matches `^(appendix|appendices|acknowledg\w*|references?|bibliography)\b` (`clean.py`)
+- [x] [Review][Patch] P9 — `_parse_authors` collapses whitespace, drops parenthesized affiliations, splits on commas / "and" (`metadata.py`)
+- [x] [Review][Defer] Dataset markup (@xmath/@xcite/<S>/filler) not cleaned — story 1.5 (owner decision)
+- [x] [Review][Defer] All-or-nothing writes of the three KB files (H8)
+- [x] [Review][Defer] `--limit` smoke runs always widen to filter=all (H10)
+- [x] [Review][Defer] Provenance URLs do not reflect --source-zip/--metadata-file overrides (H13)
+- [x] [Review][Defer] Downloaded file reused without a size/checksum check (H15)
+- [x] [Review][Defer] `errors="replace"` on source bytes is not counted (H16)
+- [x] [Review][Defer] Dedup hash ignores section structure (H18)
+- [x] [Review][Defer] LaTeX accents in titles (H20)
+- [x] [Review][Defer] Extra `verify()` invariants (H21)
+- [x] [Review][Defer] Streaming emission for the widening path (A5/H17)
+- [x] [Review][Defer] I-3 CLI override flags ambiguity
+- [x] [Review][Defer] Zip length mismatch between section_names and sections not counted (H11b)
+- [x] [Review][Defer] Remaining test-quality items T7–T13 not covered by the patches above
+
+Dismissed: concurrent file locking (outside the offline single-laptop envelope); per-section linear scan for duplicate chunk ids (H14, fine at section scale); one sqlite connection per lookup (H19, build time is not a requirement); English heuristic strength (owner kept the ASCII-share check, 2026-10-15). See review-dismiss-precedents.md.
+
+Counts: 9 patched, 13 deferred, 4 dismissed.
 
 ## Spec Change Log
 
@@ -128,6 +155,7 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 - 2026-10-14: Pre-build amendment — E-7 rank special case removed; body sections rank uniformly from 1 (E-18), abstract chunk alone takes rank 0. KEEP: one rank rule, dataset section order.
 - 2026-10-15: Mid-build amendment (owner-approved, Option A) — the real `metadata-v5` snapshot has `versions` as bare strings (no `created` date), `categories` as a one-element list, and no `license` key (found by the first full-corpus `make kb`, which crashed in `build_metadata_index`). `year` is now derived from the bare `arxiv_id` (E-19); categories list is joined then split (E-17); missing license = `""`. Rejected: switching to the Kaggle snapshot (needs per-teammate auth, unpinned weekly updates). KEEP: one year rule (from the id), no network/auth beyond the two public URLs.
 - 2026-10-15: Mid-build amendment (owner-approved) — measured cs.* yield is 5.7%, not the spike's 7.5% (15/200 sample): `train.txt` alone joins 11,512 cs.* papers (< 12k → widen to all 203,037 papers → OOM at 23.7GB RSS and ~4.3M chunks, outside the 190k–380k band). I-1 now reads all three zip members (`train`, `val`, `test`; 215,913 papers, 12,352 cs.* — clears 12k pre-clean); held-out splits carry no meaning for this KB (no model is trained on them). Threshold and filter policy unchanged. Measured peak RSS: 0.23GB at 1,000 papers (~3GB projected for the cs.* KB). KEEP: fixed member order train→val→test (determinism, E-16); widening rule unchanged.
+- 2026-10-15: Post-review amendment — P1 fold appends only non-overlapping words (E-10); P2 temp metadata index always rebuilt from scratch; P3 `run_build_command` never raises (unexpected exception → exit 3) and metadata bytes decoded strictly (bad lines counted); P4 name collisions concatenate; P5 `body` fallback when no named section survives; P6 chunk text joins prefix and body with a single space (stored text already normalized); P7 `words`/`types` over paper text; P8 boilerplate names matched after stripping `[label]`/punctuation; P9 author parsing drops affiliations and splits on commas/"and". Known limitations accepted by owner: dataset markup (@xmath/@xcite/<S>) not cleaned (deferred to story 1.5), English heuristic is ASCII-share only (some non-English papers pass). KEEP: fold appends only non-overlapping words; temp index always rebuilt from scratch; run_build_command never raises.
 
 ## Design Notes
 
@@ -136,7 +164,7 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 - **Token estimator:** `n_tokens = round(words × 4/3)` (spike arithmetic; ≈1.33 tokens/word), single-sourced in `core.config`; a real tokenizer swap later is a config-visible change (Ask First).
 - **English heuristic:** drop when ASCII-letter share of the normalized text < 0.8 (documented, dep-free); heuristic swaps are Ask First.
 - **Determinism:** no timestamps inside emitted chunk/paper records; `generated_at` lives only in kb_stats provenance. Dedup keep-first = source file order. Windows enumerated deterministically (section_rank, window index).
-- **header_prefix format:** `f"{title} — {section_name}"` prepended to chunk text with a blank-line separator; single-sourced in `chunk.py`.
+- **header_prefix format:** `f"{title} — {section_name}"` prepended to chunk text with a single space separator; single-sourced in `chunk.py`.
 
 ## Verification
 
@@ -144,17 +172,21 @@ tests/core/, tests/kb/           # mirror src/paperpilot/ — pinning tests for 
 2. `uv run python -m paperpilot.kb.cli build --limit 200 --data-dir /tmp/opencode/kb-smoke` — twice; `diff` of the two chunks.jsonl chunk_id sequences is empty (E-16).
 3. `make kb` (full corpus) — `kb_stats.json`: `papers ≥ 10000`, `words ≥ 100000`, `chunks` in 190k–380k ballpark, `dropped_no_metadata` small and documented, zero papers with null metadata (schema-enforced). Figures recorded in the story report.
 
-### Acceptance run record (task 11, 2026-10-15)
+### Acceptance run record (task 11, 2026-10-15, after the post-review patches)
 
-Full-corpus `build` (train + val + test members, local files from `data/raw/`), `filter=cs`, `filter_widened=false`. Peak RSS observed 2,616,356 kB (~2.6 GB). Figures copied from `data/kb/kb_stats.json`:
+Full-corpus `build` (train + val + test members, local files from `data/raw/`), `filter=cs`, `filter_widened=false`. Peak RSS observed 2,609,652 kB (~2.6 GB). Figures copied from `data/kb/kb_stats.json`:
 
-- papers = 12350; chunks = 273332; words = 96895756; types = 902454; year_min = 1994; year_max = 2017
+- papers = 12350; chunks = 271171; words = 81422705 (paper text); types = 870850 (paper text, lowercased); year_min = 1994; year_max = 2017
 - category_composition: cs_papers = 12350, aiml_papers = 2741, total = 12350
-- chunk_size_histogram: 0-128 = 2822, 129-255 = 27222, 256-384 = 25850, 385-512 = 209971, 513+ = 7467
-- provenance: dropped_no_metadata = 0, duplicates = 2, duplicate_chunks = 285, malformed_source_lines = 0, malformed_metadata_lines = 0, non_english_dropped = 0, boilerplate_sections_stripped = 4447, nameless_sections_dropped = 191, sections_merged_name_collision = 22, filter_mode = cs, filter_widened = false
-- Null check on `papers.jsonl`: 12350 records, 0 with a null/empty title, authors, year, or categories.
-- Smoke (`--limit 200`, run twice): chunk_id sequences identical (4217 chunks each).
+- chunk_size_histogram: 0-128 = 2755, 129-255 = 26987, 256-384 = 25640, 385-512 = 208399, 513+ = 7390 (max n_tokens = 561, within 512 + fold floor)
+- provenance: dropped_no_metadata = 0, duplicates = 2, duplicate_chunks = 285, malformed_source_lines = 0, malformed_metadata_lines = 0, non_english_dropped = 0, boilerplate_sections_stripped = 5215, nameless_sections_dropped = 191, sections_merged_name_collision = 22, filter_mode = cs, filter_widened = false
+- Checks on the outputs: 12350 papers, 0 with a null/empty title, authors, year, or categories; 0 authors containing a newline or "("; 0 remaining boilerplate sections; 0 chunks with a repeated 58-word block.
+- Smoke (`--limit 200`, run twice): chunk_id sequences identical (4187 chunks each).
 
 ## Suggested Review Order
 
-(blank until after implementation)
+1. `src/paperpilot/kb/chunk.py` — `_windows` (fold without repeated overlap), `chunk_text_for`
+2. `src/paperpilot/kb/metadata.py` — `build_metadata_index`, `join_paper`, `_parse_authors`, `year_from_arxiv_id`
+3. `src/paperpilot/kb/cli.py` — `run_build_command`, `build` (try/finally around the index)
+4. `src/paperpilot/kb/clean.py` — `is_boilerplate`
+5. `src/paperpilot/kb/stats.py` — `CorpusAggregate`, `render_stats`

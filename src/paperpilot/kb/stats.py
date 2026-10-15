@@ -61,12 +61,15 @@ class CorpusAggregate:
             self.cs_papers += 1
         if any(c in defaults.aiml_categories for c in paper.categories):
             self.aiml_papers += 1
+        # words/types over the paper text (abstract + sections), not chunk text: chunks repeat
+        # the header prefix and the window overlaps.
+        for text in (paper.abstract, *paper.sections.values()):
+            paper_words = text.split()
+            self.words += len(paper_words)
+            self.vocab.update(w.lower() for w in paper_words)
 
     def add_chunk(self, chunk: Chunk) -> None:
         self.size_hist[chunk_size_band(chunk.n_tokens)] += 1
-        chunk_words = chunk.text.split()
-        self.words += len(chunk_words)
-        self.vocab.update(w.lower() for w in chunk_words)
 
 
 def chunk_size_band(n_tokens: int) -> str:

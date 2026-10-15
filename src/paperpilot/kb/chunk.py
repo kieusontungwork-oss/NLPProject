@@ -28,8 +28,8 @@ def header_prefix_for(title: str, section_name: str) -> str:
 
 
 def chunk_text_for(header_prefix: str, body: str) -> str:
-    """Stored chunk text = prefix + blank line + body (what BM25/embeddings see)."""
-    return f"{header_prefix}\n\n{body}"
+    """Stored chunk text = prefix + single space + body (what BM25/embeddings see); already normalized (AD-2)."""
+    return f"{header_prefix} {body}"
 
 
 def _windows(words: list[str], defaults: KBDefaults) -> list[list[str]]:
@@ -38,12 +38,16 @@ def _windows(words: list[str], defaults: KBDefaults) -> list[list[str]]:
         return [words]
     windows: list[list[str]] = []
     start = 0
+    prev_start = 0
     while start < len(words):
         window = words[start : start + defaults.max_window_words]
         if windows and len(window) < defaults.fold_floor_words:
-            windows[-1].extend(window)
+            # Fold only the words past the previous window's end (no repeated overlap words).
+            prev_end = prev_start + len(windows[-1])
+            windows[-1].extend(words[prev_end:])
             break
         windows.append(window)
+        prev_start = start
         if start + defaults.max_window_words >= len(words):
             break
         start += defaults.step_words

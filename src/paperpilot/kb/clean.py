@@ -9,6 +9,8 @@ dep-free and deterministic (Design Notes).
 from __future__ import annotations
 
 import logging
+import re
+import string
 
 from paperpilot.core.config import KBDefaults
 from paperpilot.core.ids import normalize
@@ -16,23 +18,15 @@ from paperpilot.kb.stats import BuildCounters
 
 logger = logging.getLogger(__name__)
 
-BOILERPLATE_SECTION_NAMES: frozenset[str] = frozenset(
-    {
-        "references",
-        "reference",
-        "bibliography",
-        "appendix",
-        "acknowledgments",
-        "acknowledgements",
-        "acknowledgment",
-        "acknowledgement",
-    }
-)
+_LEADING_LABEL = re.compile(r"^\[[^\]]*\]")
+_BOILERPLATE_NAME = re.compile(r"^(appendix|appendices|acknowledg\w*|references?|bibliography)\b")
 
 
 def is_boilerplate(section_name: str) -> bool:
-    """True when the section is strippable boilerplate (exact match after normalize+lower)."""
-    return normalize(section_name).lower() in BOILERPLATE_SECTION_NAMES
+    """True when the section is strippable boilerplate: after normalize+lower, a leading [label] and
+    surrounding punctuation are stripped, then the name must start with a boilerplate word."""
+    name = _LEADING_LABEL.sub("", normalize(section_name).lower()).strip(string.punctuation + " ")
+    return _BOILERPLATE_NAME.match(name) is not None
 
 
 def english_letter_share(text: str, sample_chars: int) -> float:

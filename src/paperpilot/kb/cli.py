@@ -58,10 +58,10 @@ def build(
         raise KBStageError("join", f"metadata snapshot not found: {meta_path}")
 
     db_path = kb_dir / "metadata-index.tmp.sqlite3"
-    metadata.build_metadata_index(meta_path, db_path, counters)
-    metadata.check_index_usable(db_path)
-
     try:
+        metadata.build_metadata_index(meta_path, db_path, counters)
+        metadata.check_index_usable(db_path)
+
         # Pass A: decide widening (E-4) from the cs.* yield before emitting anything.
         # Malformed lines are counted only in pass B, so pass A uses throwaway counters.
         pass_a_counters = BuildCounters()
@@ -179,6 +179,9 @@ def run_build_command(argv: list[str] | None = None) -> int:
     except PaperPilotError as exc:
         print(f"kb build failed verification: {exc}", file=sys.stderr)
         return EXIT_VERIFY
+    except Exception as exc:  # never raises (house rule): any unexpected failure maps to the stage exit
+        print(f"kb build failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return EXIT_STAGE
 
     print(
         f"kb build ok: papers={stats.papers} chunks={stats.chunks} words={stats.words} "
