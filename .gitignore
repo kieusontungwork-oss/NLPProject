@@ -228,3 +228,8 @@ __marimo__/
 /reports/
 /research/
 .opencode/node_modules/
+# Test files are kept local only — never committed (see AGENT.md)
+/tests/
+test_*.py
+*_test.py
+conftest.py
