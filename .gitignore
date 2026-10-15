@@ -221,6 +221,15 @@ __marimo__/
 
 # Project-specific
 .DS_Store
-data/
+# AD-5 artifact classes: class 2 bulk + class 3 derived are ignored; class 1 (data/eval/) is tracked
+/data/raw/
+/data/kb/
+/indexes/
+/reports/
 /research/
 .opencode/node_modules/
+# Test files are kept local only — never committed (see AGENT.md)
+/tests/
+test_*.py
+*_test.py
+conftest.py
