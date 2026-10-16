@@ -8,6 +8,7 @@ stdout, errors on stderr; `run_*_command` never raise.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 import time
@@ -43,10 +44,12 @@ def build_indexes(
     """Build the docstore plus every leg the row enables; returns seconds per component."""
     store_hash = docstore_mod.chunk_store_hash(kb_dir)
     durations: dict[str, float] = {}
+    if row.use_dense and encoder is None:
+        encoder = dense_mod.SentenceTransformerEncoder(row.embedding_model)  # fail fast, before any component
 
     start = time.perf_counter()
     with atomic_component(index_dir / "docstore") as tmp:
-        docstore_mod.build_docstore(kb_dir, tmp, store_hash=store_hash, config_row=row.id)
+        store_manifest = docstore_mod.build_docstore(kb_dir, tmp, store_hash=store_hash, config_row=row.id)
     durations["docstore"] = time.perf_counter() - start
 
     if row.use_sparse:
@@ -61,8 +64,6 @@ def build_indexes(
         durations["sparse"] = time.perf_counter() - start
 
     if row.use_dense:
-        if encoder is None:
-            encoder = dense_mod.SentenceTransformerEncoder(row.embedding_model)
         start = time.perf_counter()
         with atomic_component(dense_mod.dense_dir(index_dir, row.embedding_model)) as tmp:
             dense_mod.FaissDenseRetriever.build(
@@ -72,6 +73,7 @@ def build_indexes(
                 model_id=row.embedding_model,
                 store_hash=store_hash,
                 config_row=row.id,
+                total=store_manifest.n_chunks,
             )
         durations["dense"] = time.perf_counter() - start
     return durations
@@ -92,6 +94,20 @@ def format_pack(pack: EvidencePack) -> str:
     timings = " ".join(f"{key}={value:.2f}" for key, value in pack.stage_timings_ms.items())
     lines.append(f"timings_ms: {timings}")
     return "\n".join(lines)
+
+
+def _emit(text: str) -> int:
+    """Write `text` + newline to stdout inside the never-raises guard; any I/O failure -> EXIT_STAGE."""
+    try:
+        sys.stdout.write(text + "\n")
+        sys.stdout.flush()
+    except (UnicodeEncodeError, BrokenPipeError, OSError) as exc:
+        try:
+            print(f"cannot write output to stdout: {type(exc).__name__}: {exc}", file=sys.stderr)
+        except Exception:
+            pass
+        return EXIT_STAGE
+    return EXIT_OK
 
 
 def _add_common(parser: argparse.ArgumentParser) -> None:
@@ -126,8 +142,7 @@ def run_index_command(args: argparse.Namespace, encoder: dense_mod.Encoder | Non
         print(f"index failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_STAGE
     summary = " ".join(f"{name}={secs:.2f}s" for name, secs in durations.items())
-    print(f"index ok: row={row.id} {summary}")
-    return EXIT_OK
+    return _emit(f"index ok: row={row.id} {summary}")
 
 
 def run_search_command(args: argparse.Namespace, encoder: dense_mod.Encoder | None = None) -> int:
@@ -136,14 +151,14 @@ def run_search_command(args: argparse.Namespace, encoder: dense_mod.Encoder | No
         row = get_row(args.row, args.config)
         retriever = Retriever.from_config(row, args.kb_dir, args.index_dir, encoder)
         pack = retriever.retrieve(args.query, args.k)
+        text = json.dumps(pack.model_dump(), ensure_ascii=True, indent=2) if args.json else format_pack(pack)
     except PaperPilotError as exc:
         print(f"search failed: {exc}", file=sys.stderr)
         return EXIT_STAGE
     except Exception as exc:
         print(f"search failed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return EXIT_STAGE
-    print(pack.model_dump_json(indent=2) if args.json else format_pack(pack))
-    return EXIT_OK
+    return _emit(text)
 
 
 def main(argv: list[str] | None = None) -> int:

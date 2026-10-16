@@ -41,3 +41,48 @@ first query, so ranking quality does not separate them; the gate is decided on r
 `rank-bm25` (pinned in the spine Stack table) is therefore not added to `uv.lock`; `bm25s` replaces
 it. The engine stays a config value (`sparse_engine`), so a later swap is a new adapter plus a config
 row, never a fork.
+
+## The 40 benchmark queries
+
+Used for the sparse gate above and for the story-1.3 acceptance latencies (k = 10, one warm-up query first).
+
+1. attention mechanism for neural machine translation
+2. convolutional neural network image classification
+3. generative adversarial networks training instability
+4. word embeddings semantic similarity
+5. reinforcement learning policy gradient
+6. graph neural networks node classification
+7. dropout regularization overfitting deep networks
+8. stochastic gradient descent convergence rate
+9. recurrent neural network long short-term memory
+10. variational autoencoder latent space
+11. named entity recognition conditional random fields
+12. sentiment analysis of tweets
+13. question answering reading comprehension dataset
+14. knowledge graph embedding link prediction
+15. batch normalization internal covariate shift
+16. adversarial examples robustness
+17. transfer learning domain adaptation
+18. topic modeling latent dirichlet allocation
+19. speech recognition acoustic model
+20. object detection region proposal
+21. differential privacy machine learning
+22. federated optimization communication cost
+23. compressed sensing sparse recovery
+24. matrix factorization recommender systems
+25. monte carlo tree search game playing
+26. bayesian optimization hyperparameter tuning
+27. kernel methods support vector machines
+28. clustering high dimensional data
+29. semantic segmentation fully convolutional
+30. image captioning encoder decoder
+31. dependency parsing transition based
+32. SAT solver satisfiability heuristics
+33. formal verification model checking
+34. distributed consensus byzantine fault tolerance
+35. wireless network scheduling throughput
+36. cryptographic protocol security proof
+37. approximation algorithm submodular maximization
+38. social network community detection
+39. information retrieval ranking function
+40. low rank matrix completion

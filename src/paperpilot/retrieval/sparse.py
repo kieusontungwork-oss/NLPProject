@@ -18,11 +18,16 @@ from paperpilot.core.errors import RetrievalStageError
 from paperpilot.core.ports import LegHit
 from paperpilot.core.schemas import IndexManifest
 from paperpilot.retrieval import manifest as manifests
-from paperpilot.retrieval.tokenize import tokenize
+from paperpilot.retrieval.tokenize import tokenize, tokenizer_fingerprint
 
 logger = logging.getLogger(__name__)
 
 ENGINE = "bm25s"
+
+
+def live_params() -> dict:
+    """The BM25 params + tokenizer fingerprint an index must have been built with."""
+    return {"method": BM25_METHOD, "k1": BM25_K1, "b": BM25_B, "tokenizer": tokenizer_fingerprint()}
 
 
 def sparse_dir(index_dir: Path) -> Path:
@@ -42,9 +47,11 @@ class Bm25sRetriever:
         corpus = [tokenize(text) for text in texts]
         if not corpus:
             raise RetrievalStageError("sparse", "no chunks to index")
+        logger.info("sparse: tokenized %d chunks; building bm25s index", len(corpus))
         index = bm25s.BM25(method=BM25_METHOD, k1=BM25_K1, b=BM25_B)
         index.index(corpus, show_progress=False)
         index.save(out_dir)
+        logger.info("sparse: bm25s index built (%d docs)", len(corpus))
         manifest = IndexManifest(
             created=manifests.utc_now(),
             embedding_model=None,
@@ -53,7 +60,7 @@ class Bm25sRetriever:
             config_row=config_row,
             engine=ENGINE,
             n_chunks=len(corpus),
-            params={"method": BM25_METHOD, "k1": BM25_K1, "b": BM25_B},
+            params=live_params(),
         )
         manifests.write_manifest(out_dir, manifest)
         return manifest
@@ -66,6 +73,7 @@ class Bm25sRetriever:
         directory = Path(directory)
         manifest = manifests.read_manifest(directory)
         manifests.check_manifest(manifest, chunk_store_hash=store_hash, engine=engine)
+        manifests.check_params(manifest, live_params())
         if manifest.n_chunks != len(chunk_ids):
             raise RetrievalStageError(
                 "sparse", f"sparse index has {manifest.n_chunks} docs but docstore has {len(chunk_ids)} chunks"
@@ -75,7 +83,10 @@ class Bm25sRetriever:
 
     def search(self, query: str, depth: int) -> list[LegHit]:
         tokens = tokenize(query)
-        if not tokens or depth < 1:
+        if not tokens:
+            logger.warning("sparse: query %r has no BM25 tokens (stopwords / short / empty); leg returns nothing", query)
+            return []
+        if depth < 1:
             return []
         scores = self._index.get_scores(tokens)
         candidates = np.flatnonzero(scores > 0)

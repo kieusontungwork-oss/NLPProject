@@ -63,19 +63,40 @@ def check_manifest(
         raise IndexMismatchError("engine", engine, manifest.engine)
 
 
+def _siblings(final_dir: Path, kind: str) -> list[Path]:
+    return sorted(final_dir.parent.glob(f".{final_dir.name}.{kind}-*"), key=lambda p: p.stat().st_mtime)
+
+
+def check_params(manifest: IndexManifest, expected: dict) -> None:
+    """Refuse a manifest whose `params` differ from the live values (one error per first differing key)."""
+    for key, value in expected.items():
+        found = manifest.params.get(key)
+        if found != value:
+            raise IndexMismatchError(f"params.{key}", value, found)
+
+
 @contextmanager
 def atomic_component(final_dir: Path) -> Iterator[Path]:
     """Yield a temp sibling directory; swap it over `final_dir` only if the body completes.
 
-    On any exception the temp directory is removed and the previous component is untouched.
+    On entry: an orphaned `.name.old-*` (a build killed between the two renames) is restored when
+    `final_dir` is missing, then every stale `.name.tmp-*` / `.name.old-*` sibling is removed.
+    On any exception the temp directory is removed and the previous component is untouched; if
+    restoring the previous component itself fails, it is kept (never deleted).
     """
     final_dir = Path(final_dir)
     final_dir.parent.mkdir(parents=True, exist_ok=True)
+    olds = _siblings(final_dir, "old")
+    if not final_dir.exists() and olds:
+        logger.warning("restoring orphaned previous component %s -> %s", olds[-1], final_dir)
+        olds[-1].rename(final_dir)
+        olds = olds[:-1]
+    for stale in [*_siblings(final_dir, "tmp"), *olds]:
+        shutil.rmtree(stale, ignore_errors=True)
     tmp = final_dir.parent / f".{final_dir.name}.tmp-{os.getpid()}"
     old = final_dir.parent / f".{final_dir.name}.old-{os.getpid()}"
-    shutil.rmtree(tmp, ignore_errors=True)
-    shutil.rmtree(old, ignore_errors=True)
     tmp.mkdir()
+    keep_old = False
     try:
         yield tmp
         if final_dir.exists():
@@ -84,10 +105,15 @@ def atomic_component(final_dir: Path) -> Iterator[Path]:
             tmp.rename(final_dir)
         except Exception:
             if old.exists():
-                old.rename(final_dir)
+                try:
+                    old.rename(final_dir)
+                except Exception:
+                    keep_old = True
+                    logger.exception("could not restore previous component %s -> %s; kept at %s", old, final_dir, old)
             raise
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
     finally:
-        shutil.rmtree(old, ignore_errors=True)
+        if not keep_old:
+            shutil.rmtree(old, ignore_errors=True)

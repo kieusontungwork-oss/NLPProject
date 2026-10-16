@@ -123,12 +123,41 @@ tests/core/, tests/retrieval/         # local only (never committed): pinning te
 
 ## Review Findings
 
-(pending)
+Fresh-context review: edge-case hunter (H1–H20), test audit (T1–T16, ~70 mutations), acceptance auditor (A1–A5; no contract violated). Three Sonnet subagents, run concurrently.
+
+- [x] [Review][Patch] P1 (H2) — CLI output printed outside the never-raises guard; a non-UTF-8 stdout or closed pipe gives a traceback + exit 1 (`retrieval/cli.py` `run_index_command`, `run_search_command`)
+- [x] [Review][Patch] P2 (H3, A2, T2) — killed builds leak `.<name>.tmp-<pid>` / `.old-<pid>` forever, and a kill between the two renames leaves no component; sweep stale siblings at entry, restore an orphaned `.old-*`, never delete `old` when the restore fails (`retrieval/manifest.py` `atomic_component`)
+- [x] [Review][Patch] P3 (H4) — query not NFC-normalized; NFD "café" tokenizes to `cafe` and misses (`retrieval/tokenize.py`)
+- [x] [Review][Patch] P4 (H5) — sparse load never checks BM25 params or the tokenizer; a changed stopword list silently serves a stale index. Record a tokenizer fingerprint in `params`, compare params at load; pass `engine` in the docstore and dense loads (`sparse.py`, `manifest.py`, `docstore.py`, `dense.py`)
+- [x] [Review][Patch] P5 (H6) — dense load and search don't check `index.d` vs manifest `dim` / query vector dim; mismatch is a bare `AssertionError` (`dense.py`)
+- [x] [Review][Patch] P6 (H7) — encoder output not checked for finiteness / unit norm (`dense.py` `_check_vectors`)
+- [x] [Review][Patch] P7 (H8, H18) — fail fast: build constructs the encoder only after docstore + sparse; `from_config` loads the model before checking the dense index. No progress logging during the multi-hour dense build (`cli.py` `build_indexes`, `retriever.py` `from_config`, `dense.py` `build`)
+- [x] [Review][Patch] P8 (H1) — MiniLM's 256-word-piece window truncates long chunks silently; record `max_seq_length` in the dense manifest `params` and log it at build (`dense.py`)
+- [x] [Review][Patch] P9 (H11) — `hydrate` failures after a KB rewrite surface as raw `JSONDecodeError` (`docstore.py` `hydrate`)
+- [x] [Review][Patch] P10 (H12) — chunk lines not schema-validated; a missing key is a bare `KeyError` with no file/line (`docstore.py` `iter_chunks`)
+- [x] [Review][Patch] P11 (H20) — docstore load doesn't check `chunk_ids` / `offsets` / `n_chunks` agree (`docstore.py` `Docstore.load`)
+- [x] [Review][Patch] P12 (H15) — a query with no BM25 tokens returns nothing silently; log a warning (`sparse.py` `search`)
+- [x] [Review][Patch] P13 (A1, T11) — E-12 only reachable via the manifest (dense dir is keyed by the model slug, so another model is E-13); the missing-dense message lists the models present under `indexes/dense/`. Spec E-12 clarified in the Change Log
+- [x] [Review][Patch] P14 (H19) — pin `numpy`/`scipy`/`torch` in `pyproject.toml` to the locked versions; `Makefile` `ROW ?= E3`
+- [x] [Review][Patch] P15 (A5) — module conventions: logger in `core/ports.py`, `core/timing.py`; docstring in `retrieval/__init__.py`
+- [x] [Review][Patch] P16 (T1, T3, T4, T5, T7, T8, T9, T10, T12, T13, T14, T15 `match=` nits) — test gaps from the mutation run (tests stay local)
+- [x] [Review][Patch] P17 (A3) — acceptance record gets fusion/hydrate p95; the 40 benchmark queries are listed in the benchmark note; stale `rank_bm25 first` text in `docs/` and the top-50 RRF note in `pipeline-stages.md` updated
+- [x] [Review][Defer] H9 — sparse build holds every token as its own `str` (5.6GB peak measured; fits the team's 16GB laptops). Target: a later retrieval performance pass
+- [x] [Review][Defer] H8 (part) — idempotent rebuild (skip unchanged components) and per-batch resume of the dense build. Target: when index rebuilds become frequent (story 1.5 bge-m3)
+- [x] [Review][Defer] H10 — the full SHA-256 of `chunks.jsonl` on every load (<1s measured inside the 0.7s/3.8s cold starts). Target: later performance pass
+- [x] [Review][Defer] H14, A4 — the dense leg cuts top-k inside FAISS before the `(-score, row)` sort, so exact ties straddling position 300 are FAISS's pick (deterministic on one build; E-18 holds). Target: story 1.4 if eval shows boundary ties
+- [x] [Review][Defer] H16 — `embedding_model` id validation, `candidate_depth` upper bound, single-sourcing the `"bm25s"` Literal and leg names. Target: story 1.5 (adds models and flags)
+- [x] [Review][Defer] H17 — pin the HF model revision in the manifest; query/document prefixes for asymmetric models. Target: story 1.5 (bge-m3)
+
+Dismissed: H13 cross-component transactions / concurrent searches during a rebuild (concurrent-file-locking precedent: offline single-laptop envelope); H10 TOCTOU with a concurrent `make kb` (same precedent); argparse usage errors exiting 2 (argparse convention, documented in `main`); noisy third-party INFO logs on stderr (stdout stays clean for `--json`); T6 the min-leg-rank tie term is unreachable with integer ranks (harmless, spec-mandated tie rule).
+
+Counts: 17 patch groups, 6 deferred, 5 dismissed.
 
 ## Spec Change Log
 
 - 2026-10-15: Initial frozen block from project spec CAP-2 + stories.yaml story 3 + pipeline-stages + stack.md + spine AD-1/3/4/5, and the sparse-engine benchmark gate (bmad-spec, in-session per the story-1.2 precedent). Resolves the spine Deferred item "Sparse engine final pick" → `bm25s`.
 - 2026-10-16: Build amendment — `torch` added as a direct (unpinned) runtime dependency. uv applies `[tool.uv.sources]` only to direct dependencies, so with torch only transitive the lock took the CUDA build plus ~16 nvidia packages; as a direct dependency it resolves to `2.14.1+cpu` from the PyTorch CPU index (`sys_platform != 'darwin'`). No new package enters the tree. Spec interpretations by the builder, accepted: `DenseRetriever` port = `encode(query)` + `search(vector, depth)` (separate `dense_encode`/`dense_search` timings, and the shape HyDE needs in 1.5); dense/docstore manifests use `engine: "faiss-flat-ip"` / `"docstore"` with empty `params`; `EMBED_BATCH_SIZE = 128`; device left to sentence-transformers. KEEP: torch from the CPU index; the dense port keeps encode and search separate.
+- 2026-10-16: Post-review amendment — P1 CLI output written inside the never-raises guard (`--json` ASCII-safe); P2 `atomic_component` restores an orphaned `.old-*` and sweeps stale `.tmp-*`/`.old-*` siblings from any pid, never deleting `old` when its restore fails; P3 the tokenizer NFC-normalizes first; P4 the sparse manifest `params` carries a tokenizer fingerprint and the loader compares `{method, k1, b, tokenizer}`, docstore/dense loads check `engine`; P5–P6 dense dim, finiteness and unit-norm checks; P7 encoder built before any component, dense index checked before the model loads, progress logged every 100 batches; P8 dense manifest records `max_seq_length`; P9–P11 docstore hydrate/iter/load failures are typed with path:line, chunk lines validated by `core.schemas.Chunk`; P12 warning on token-less queries; P13 a missing dense component lists the models present. E-12 clarified: the dense directory is keyed by the model slug, so a different configured model surfaces as E-13 (`IndexMissingError` listing the models present); `IndexMismatchError` on `embedding_model` fires when a manifest disagrees with its directory. P14 pins numpy 2.4.6 / scipy 1.17.1 / torch 2.14.1 (the lock collapses the per-Python-version splits). The sparse index was rebuilt (`index --row E1`, 59s) for the fingerprint; the dense index was kept (its loader checks are unchanged in what they read). Acceptance re-run after the patches: E1/E2/E3 20/20, total p50 1.2 / 55.2 / 53.8ms. KEEP: the CLI never raises, including on output; stale build siblings are swept and an orphaned previous component is restored, never deleted; the tokenizer fingerprint is checked at load.
 
 ## Design Notes
 
@@ -157,15 +186,17 @@ Real KB: 271,171 chunks (`chunk_store_hash` 9eb28acf…be30f), laptop CPU (16 th
 
 Serving, 40 benchmark queries per row, k = 10, after one warm-up query (ms):
 
-| Row | Cold start | sparse p50/p95 | dense_encode p50/p95 | dense_search p50/p95 | fusion p50 | hydrate p50 | total p50/p95 | Peak RSS | Title known-item top-10 |
+| Row | Cold start | sparse p50/p95 | dense_encode p50/p95 | dense_search p50/p95 | fusion p50/p95 | hydrate p50/p95 | total p50/p95 | Peak RSS | Title known-item top-10 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| E1 | 0.73s | 0.70 / 0.94 | — | — | 0.26 | 0.17 | 1.14 / 1.57 | 445MB | 20/20 |
-| E2 | 3.79s | — | 19.5 / 24.3 | 35.9 / 41.8 | 0.42 | 0.33 | 55.6 / 65.9 | 995MB | 20/20 |
-| E3 | 3.88s | 1.12 / 1.55 | 16.6 / 22.6 | 35.2 / 43.2 | 0.79 | 0.34 | 53.6 / 65.6 | 1,318MB | 20/20 |
+| E1 | 0.73s | 0.70 / 0.94 | — | — | 0.26 / 0.31 | 0.17 / 0.22 | 1.14 / 1.57 | 445MB | 20/20 |
+| E2 | 3.79s | — | 19.5 / 24.3 | 35.9 / 41.8 | 0.42 / 0.43 | 0.33 / 0.44 | 55.6 / 65.9 | 995MB | 20/20 |
+| E3 | 3.88s | 1.12 / 1.55 | 16.6 / 22.6 | 35.2 / 43.2 | 0.79 / 0.87 | 0.34 / 0.37 | 53.6 / 65.6 | 1,318MB | 20/20 |
 
-Known-item check: 20 papers sampled with `random.Random(13)`, query = paper title; E1 and E3 ≥ 18/20 required — met (20/20 each).
+Queries: the 40 listed in `research/sparse-engine-benchmark-2026-10-15.md`. Known-item check: 20 papers sampled with `random.Random(13)`, query = paper title; E1 and E3 ≥ 18/20 required — met (20/20 each).
 
 ## Suggested Review Order
+
+Post-review patches first: `retrieval/manifest.py` `atomic_component` (P2), `retrieval/cli.py` `_emit` (P1), `retrieval/sparse.py` `load`/params check + `tokenize.py` `tokenizer_fingerprint` (P3–P4), `retrieval/dense.py` `_check_vectors`, `load(encoder_factory)` (P5–P8), `retrieval/docstore.py` `iter_chunks`/`Docstore.load`/`hydrate` (P9–P11). Then the original order:
 
 1. `src/paperpilot/retrieval/retriever.py` — `Retriever.from_config`, `retrieve` (timings, hydration, pack assembly)
 2. `src/paperpilot/retrieval/fusion.py` — `rrf` (tie rule, per-leg scores)

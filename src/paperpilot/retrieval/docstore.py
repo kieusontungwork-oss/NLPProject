@@ -14,9 +14,10 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
+from pydantic import ValidationError
 
 from paperpilot.core.errors import IndexMissingError, RetrievalStageError
-from paperpilot.core.schemas import IndexManifest
+from paperpilot.core.schemas import Chunk, IndexManifest
 from paperpilot.retrieval import manifest as manifests
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,10 @@ def iter_chunks(kb_dir: Path) -> Iterator[tuple[int, dict]]:
             if not line.strip():
                 raise RetrievalStageError("docstore", f"{path}:{lineno}: blank line breaks row alignment")
             try:
-                yield start, json.loads(line)
-            except ValueError as exc:
-                raise RetrievalStageError("docstore", f"{path}:{lineno}: malformed JSON: {exc}") from exc
+                chunk = Chunk.model_validate_json(line)
+            except ValidationError as exc:
+                raise RetrievalStageError("docstore", f"{path}:{lineno}: invalid chunk: {exc}") from exc
+            yield start, chunk.model_dump()
 
 
 def _load_papers_meta(kb_dir: Path) -> dict[str, dict]:
@@ -138,13 +140,22 @@ class Docstore:
         """Load the component, refusing on a missing directory or a chunk-store hash mismatch."""
         directory = Path(directory)
         manifest = manifests.read_manifest(directory)
-        manifests.check_manifest(manifest, chunk_store_hash=store_hash)
+        manifests.check_manifest(manifest, chunk_store_hash=store_hash, engine=ENGINE)
         try:
             chunk_ids = json.loads((directory / CHUNK_IDS_NAME).read_text(encoding="utf-8"))
             offsets = np.load(directory / OFFSETS_NAME)
             papers_meta = json.loads((directory / PAPERS_META_NAME).read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
             raise IndexMissingError(exc.filename or directory) from exc
+        except (ValueError, OSError) as exc:
+            raise RetrievalStageError("docstore", f"unreadable docstore in {directory}: {exc}; run `make index`") from exc
+        if not (isinstance(chunk_ids, list) and offsets.ndim == 1 and len(chunk_ids) == offsets.shape[0] == manifest.n_chunks):
+            raise RetrievalStageError(
+                "docstore",
+                f"docstore in {directory} is inconsistent: chunk_ids="
+                f"{len(chunk_ids) if isinstance(chunk_ids, list) else type(chunk_ids).__name__}, "
+                f"offsets={offsets.shape}, manifest n_chunks={manifest.n_chunks}; run `make index`",
+            )
         return cls(kb_dir, chunk_ids, offsets, papers_meta)
 
     def __len__(self) -> int:
@@ -156,14 +167,20 @@ class Docstore:
     def hydrate(self, chunk_ids: list[str]) -> list[dict]:
         """Return, per chunk id, the chunk fields plus `title`/`year`/`source_link` (input order kept)."""
         out: list[dict] = []
+        stale = "chunk store changed since `make index`; run `make index`"
         with chunks_path(self.kb_dir).open("rb") as handle:
             for chunk_id in chunk_ids:
                 handle.seek(int(self.offsets[self._rows[chunk_id]]))
-                chunk = json.loads(handle.readline())
-                if chunk["chunk_id"] != chunk_id:
+                line = handle.readline()
+                try:
+                    chunk = json.loads(line)
+                    found = chunk["chunk_id"]
+                    meta = self.papers_meta[chunk["arxiv_id"]]
+                except (ValueError, KeyError, TypeError) as exc:
+                    raise RetrievalStageError("docstore", f"cannot read chunk {chunk_id!r}: {stale}") from exc
+                if found != chunk_id:
                     raise RetrievalStageError(
-                        "docstore", f"offset for {chunk_id!r} points at {chunk['chunk_id']!r}; run `make index`"
+                        "docstore", f"offset for {chunk_id!r} points at {found!r}: {stale}"
                     )
-                meta = self.papers_meta[chunk["arxiv_id"]]
                 out.append({**chunk, **meta})
         return out

@@ -55,6 +55,7 @@ User research question
 ### Candidate depth (pinned 2026-10-12)
 
 - The boost is applied to each leg's `candidate_depth` of **300** retrieved chunks (a configuration value). The leg then re-sorts, and only afterwards is the top-50 cut taken into RRF.
+- Without section weighting (E1–E3, story 1.3), RRF fuses each leg's full `candidate_depth` list, so Recall@100 stays measurable; the top-50 cut belongs to the rerank path (`rerank_depth`, story 1.5).
 - Applying the boost to an already-truncated top-50 reproduces the same no-op one stage earlier: a relevant Methods chunk at rank 63 could never be promoted.
 - E6 reports the candidate depth it used; comparing 50 vs 300 is one additional ablation row if time permits.
 

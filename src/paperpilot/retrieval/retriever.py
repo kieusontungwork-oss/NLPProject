@@ -63,12 +63,10 @@ class Retriever:
                 engine=row.sparse_engine,
             )
         if row.use_dense:
-            if encoder is None:
-                encoder = dense_mod.SentenceTransformerEncoder(row.embedding_model)
             dense = dense_mod.FaissDenseRetriever.load(
                 dense_mod.dense_dir(index_dir, row.embedding_model),
                 store.chunk_ids,
-                encoder,
+                (lambda: encoder) if encoder is not None else (lambda: dense_mod.SentenceTransformerEncoder(row.embedding_model)),
                 store_hash=store_hash,
                 embedding_model=row.embedding_model,
             )

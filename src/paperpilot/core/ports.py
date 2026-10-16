@@ -7,10 +7,13 @@ The dense port is split into `encode` + `search` so the caller can time `dense_e
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

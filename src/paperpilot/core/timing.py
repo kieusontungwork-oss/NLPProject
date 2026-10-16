@@ -5,9 +5,12 @@ Story 1.3 · CAP-2 · spine AD-3 (`stage_timings_ms`); timings are float ms via 
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager

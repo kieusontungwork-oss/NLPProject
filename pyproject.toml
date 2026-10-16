@@ -7,11 +7,11 @@ dependencies = [
     "pydantic==2.14.1",
     "pyyaml>=6.0",
     "bm25s==0.3.13",
-    "numpy",
-    "scipy",
+    "numpy==2.4.6",
+    "scipy==1.17.1",
     "faiss-cpu==1.15.1",
     "sentence-transformers==6.1.0",
-    "torch",
+    "torch==2.14.1",
 ]
 
 [dependency-groups]

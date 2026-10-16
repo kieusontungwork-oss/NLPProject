@@ -7,6 +7,8 @@ kb:
 	uv sync
 	uv run python -m paperpilot.kb.cli build
 
+ROW ?= E3
+
 index:
 	uv sync
-	uv run python -m paperpilot.retrieval.cli index --row E3
+	uv run python -m paperpilot.retrieval.cli index --row $(ROW)
