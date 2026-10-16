@@ -36,7 +36,7 @@ Full invariants live in the spine (AD-1…AD-6) — this digest condenses; the s
 - KB schemas per `pipeline-stages.md`: paper = `arxiv_id, title, authors[], year, abstract, sections{...}, source_link, license, categories[]`; chunk = `chunk_id, arxiv_id, section_name, section_rank, text, n_tokens, header_prefix`.
 
 ## Stack pins (spine Stack table; `uv.lock` is the authority)
-- Python 3.11+ (uv); pydantic 2.14.1; sentence-transformers 6.1.0; faiss-cpu 1.15.1; rank-bm25 0.2.2; ir-measures 0.4.3; ragas 0.4.3; streamlit 1.65.0; HF `armanc/scientific_papers` arxiv split + `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json` join (pre-2007 ids re-slash).
+- Python 3.11+ (uv); pydantic 2.14.1; sentence-transformers 6.1.0; faiss-cpu 1.15.1; bm25s 0.3.13 (replaced rank-bm25 at the story-1.3 gate); ir-measures 0.4.3; ragas 0.4.3; streamlit 1.65.0; HF `armanc/scientific_papers` arxiv split + `gs://arxiv-dataset/metadata-v5/arxiv-metadata-oai.json` join (pre-2007 ids re-slash).
 - No orchestration frameworks; Ollama only local server; keys from git-ignored `.env`.
 
 ## Patterns minted by story 1.2 (binding for later stories)

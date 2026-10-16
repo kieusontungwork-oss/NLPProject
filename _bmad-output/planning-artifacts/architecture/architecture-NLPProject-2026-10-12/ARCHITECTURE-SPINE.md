@@ -95,7 +95,7 @@ graph TD
 | pydantic | 2.14.1 |
 | sentence-transformers | 6.1.0 |
 | faiss-cpu | 1.15.1 |
-| rank-bm25 | 0.2.2 |
+| bm25s | 0.3.13 (sparse engine; benchmark gate 2026-10-15 replaced rank-bm25) |
 | ir-measures | 0.4.3 |
 | ragas | 0.4.3 |
 | streamlit | 1.65.0 |
@@ -168,7 +168,7 @@ flowchart LR
 
 ## Deferred
 
-- Sparse engine final pick (`rank_bm25` → `bm25s` → SQLite FTS5 → Elasticsearch ladder; gate criteria = peak RSS + cold-start + p50 latency, benchmark-gated at Story 3 prep — AD-1's port makes the swap a config row, not a fork).
+- ~~Sparse engine final pick~~ **RESOLVED 2026-10-15 (Story 1.3 prep): `bm25s`** — see `_bmad-output/planning-artifacts/research/sparse-engine-benchmark-2026-10-15.md`.
 - Generator model tag and free-tier hosted adapter (Week 3; behind `Generator` port).
 - Gate threshold `τ` value and its calibration protocol on the ~50-question dev slice (gate semantics already fixed in `pipeline-stages.md`).
 - E7 faithfulness self-check mechanism (Q5 default scope).

@@ -79,7 +79,7 @@ Then `make index` (B's `retrieval/`):
 flowchart LR
     CHUNKS["chunks.jsonl"] --> EMB["embed every chunk<br/>all-MiniLM-L6-v2 (CPU) / bge-m3 (Colab)"]
     EMB --> FAISS["FAISS IndexFlatIP (exact, default)<br/>vectors normalised → IP = cosine<br/>380k × 384d ≈ 583MB · ~10–30ms/query<br/>+ id-map chunk_id ↔ row<br/>(IVFFlat = config row, Q4 scalability only)"]
-    CHUNKS --> BM25["BM25 index (rank_bm25 first;<br/>FTS5 / ES are ladder fallbacks)"]
+    CHUNKS --> BM25["BM25 index (bm25s, chosen by the<br/>2026-10-15 benchmark gate)"]
     FAISS --> MAN["indexes/manifest.json<br/>created · embedding_model · dim ·<br/>chunk_store_hash · config_row (AD-5)"]
     BM25 --> MAN
 ```
@@ -98,7 +98,7 @@ flowchart TD
     QP -->|"use_multi_query (both legs)"| MQ["3–5 paraphrases via local LLM;<br/>per-leg rankings pooled with RRF"]
     QP --> RAWQ["raw query"]
 
-    RAWQ --> SPARSE["BM25 leg (rank_bm25 / FTS5 / ES behind SparseRetriever)"]
+    RAWQ --> SPARSE["BM25 leg (bm25s behind SparseRetriever)"]
     MQ --> SPARSE
     RAWQ --> DENSE["dense leg: embed query → FAISS exact scan (FlatIP)"]
     HYDE --> DENSE

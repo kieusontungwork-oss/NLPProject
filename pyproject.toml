@@ -5,12 +5,18 @@ description = "PaperPilot: retrieval-augmented research assistant over arXiv AI/
 requires-python = ">=3.11"
 dependencies = [
     "pydantic==2.14.1",
+    "pyyaml>=6.0",
+    "bm25s==0.3.13",
+    "numpy==2.4.6",
+    "scipy==1.17.1",
+    "faiss-cpu==1.15.1",
+    "sentence-transformers==6.1.0",
+    "torch==2.14.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "pyyaml>=6.0",
 ]
 
 [build-system]
@@ -23,3 +29,11 @@ packages = ["src/paperpilot"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }

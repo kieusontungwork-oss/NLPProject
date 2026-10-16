@@ -180,7 +180,7 @@ sources:
 
 ## Open Questions
 
-- **Sparse engine choice**: agreed ladder (user decision 2026-09-18; gate criteria widened 2026-10-12 — at 190k-380k chunks the binding constraint is memory + persistence, not query latency); final call benchmark-gated at Story 3 prep.
+- ~~**Sparse engine choice**~~ **RESOLVED 2026-10-15 (Story 1.3 prep benchmark): `bm25s`** — `rank_bm25` failed the RSS/cold-start criteria; see `_bmad-output/planning-artifacts/research/sparse-engine-benchmark-2026-10-15.md`. Original question: agreed ladder (user decision 2026-09-18; gate criteria widened 2026-10-12 — at 190k-380k chunks the binding constraint is memory + persistence, not query latency); final call benchmark-gated at Story 3 prep.
 
   - **Gate criteria (measured on the real chunk count, not a sample):** (1) peak RSS during index build (must fit a 16GB laptop with room to spare), (2) cold-start time to first query (a full re-tokenise per `make eval`/UI start is a failure — 6 ablation rows = 6 rebuilds), (3) p50 query latency.
   - **1st choice, `rank_bm25`:** pure Python, zero setup; ~100-300ms/query at our scale; scoring code readable, which the brief rewards. Known risk: `BM25Okapi` keeps the tokenised corpus + per-doc term-frequency dicts in RAM (order of GB at 380k docs) and has no save/load.

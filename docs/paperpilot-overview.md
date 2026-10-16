@@ -62,7 +62,7 @@ Every `[optional]` stage is a **config flag** — the same pipeline runs with ea
 | Component        | Choice                                                                                                                                                        |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Language         | Python 3.11+ (uv-managed venv)                                                                                                                                |
-| Sparse retrieval | BM25 — engine ladder decided by benchmark: `rank_bm25` → `bm25s` → SQLite FTS5 → Elasticsearch (last resort), behind one interface                    |
+| Sparse retrieval | BM25 on `bm25s`, chosen by the 2026-10-15 benchmark gate (the `rank_bm25` → `bm25s` → SQLite FTS5 → Elasticsearch ladder), behind one interface                    |
 | Dense retrieval  | `all-MiniLM-L6-v2` (CPU baseline) → `BAAI/bge-m3` (Colab T4 upgrade)                                                                                     |
 | Vector index     | FAISS `IndexFlatIP` exact (vectors normalized; IVF kept only for the scalability discussion)                                                                |
 | Hybrid fusion    | Reciprocal Rank Fusion (RRF, k=60) — course-designated                                                                                                       |
