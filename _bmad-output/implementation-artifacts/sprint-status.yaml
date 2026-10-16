@@ -49,7 +49,7 @@ development_status:
   1-3-baseline-retrieval-bm25-dense-rrf-hybrid: in-progress
   1-4-eval-harness-v1-retrieval-metrics-from-qrels: backlog
   1-5-retrieval-innovations-rerank-query-rewrite-section-aware-wei: backlog
-  1-6-labeling-sprint-qrels-pooling-qa-pairs-guidelines-iaa-report: backlog
+  1-6-labeling-sprint-qrels-pooling-qa-pairs-guidelines-iaa-report: in-progress
   1-7-grounded-generator-ollama-llm-citations-insufficient-evidenc: backlog
   1-8-answer-level-evaluation-ragas-em-f1-speed-protocol: backlog
   1-9-streamlit-ui-grounded-answers-with-inspectable-evidence: backlog
