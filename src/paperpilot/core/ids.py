@@ -30,3 +30,11 @@ def chunk_id(arxiv_id: str, section_name: str, text: str) -> str:
     """
     payload = f"{arxiv_id}{_UNIT_SEP}{section_name}{_UNIT_SEP}{normalize(text)}"
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def adhoc_query_id(query: str) -> str:
+    """Default query id for ad-hoc retrieval: "adhoc-" + first 12 hex of SHA-1 over normalize(query).
+
+    Story 1.3 · O-4. Reuses `normalize` so whitespace/Unicode variants of a query share an id.
+    """
+    return "adhoc-" + hashlib.sha1(normalize(query).encode("utf-8")).hexdigest()[:12]

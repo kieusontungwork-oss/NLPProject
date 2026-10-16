@@ -128,6 +128,7 @@ tests/core/, tests/retrieval/         # local only (never committed): pinning te
 ## Spec Change Log
 
 - 2026-10-15: Initial frozen block from project spec CAP-2 + stories.yaml story 3 + pipeline-stages + stack.md + spine AD-1/3/4/5, and the sparse-engine benchmark gate (bmad-spec, in-session per the story-1.2 precedent). Resolves the spine Deferred item "Sparse engine final pick" → `bm25s`.
+- 2026-10-16: Build amendment — `torch` added as a direct (unpinned) runtime dependency. uv applies `[tool.uv.sources]` only to direct dependencies, so with torch only transitive the lock took the CUDA build plus ~16 nvidia packages; as a direct dependency it resolves to `2.14.1+cpu` from the PyTorch CPU index (`sys_platform != 'darwin'`). No new package enters the tree. Spec interpretations by the builder, accepted: `DenseRetriever` port = `encode(query)` + `search(vector, depth)` (separate `dense_encode`/`dense_search` timings, and the shape HyDE needs in 1.5); dense/docstore manifests use `engine: "faiss-flat-ip"` / `"docstore"` with empty `params`; `EMBED_BATCH_SIZE = 128`; device left to sentence-transformers. KEEP: torch from the CPU index; the dense port keeps encode and search separate.
 
 ## Design Notes
 
@@ -145,6 +146,32 @@ tests/core/, tests/retrieval/         # local only (never committed): pinning te
 2. Smoke on a synthetic KB in `/tmp/claude-…/scratchpad`: `index --row E3 --kb-dir <tmp>/kb --index-dir <tmp>/idx` then `search "…" --row E1|E2|E3` with a fake or real encoder; exit 0; `--json` parses as an EvidencePack.
 3. `make index` on the real KB, then the Task 8 measurements; figures recorded below.
 
+### Acceptance run record (task 8, 2026-10-16)
+
+Real KB: 271,171 chunks (`chunk_store_hash` 9eb28acf…be30f), laptop CPU (16 threads), torch CPU wheels. Full build `index --row E3`, run from the activated `.venv`:
+
+- Build time: docstore 2.6s, sparse (bm25s) 49.6s, dense (MiniLM, CPU) 8,573.7s (~2h23m; ~40 min of it shared the CPU with an unrelated pytest run). Wall clock 2:23:50.
+- Peak RSS for the whole build: 5.64GB (dominated by the sparse tokenized corpus).
+- Disk: docstore 9.2MB, sparse 268MB, dense 398MB (271,171 × 384 float32, IndexFlatIP).
+- An earlier build was killed mid-dense by a session exit; it left `indexes/dense/.…tmp-<pid>` behind (the previous component was untouched, as E-14 requires).
+
+Serving, 40 benchmark queries per row, k = 10, after one warm-up query (ms):
+
+| Row | Cold start | sparse p50/p95 | dense_encode p50/p95 | dense_search p50/p95 | fusion p50 | hydrate p50 | total p50/p95 | Peak RSS | Title known-item top-10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| E1 | 0.73s | 0.70 / 0.94 | — | — | 0.26 | 0.17 | 1.14 / 1.57 | 445MB | 20/20 |
+| E2 | 3.79s | — | 19.5 / 24.3 | 35.9 / 41.8 | 0.42 | 0.33 | 55.6 / 65.9 | 995MB | 20/20 |
+| E3 | 3.88s | 1.12 / 1.55 | 16.6 / 22.6 | 35.2 / 43.2 | 0.79 | 0.34 | 53.6 / 65.6 | 1,318MB | 20/20 |
+
+Known-item check: 20 papers sampled with `random.Random(13)`, query = paper title; E1 and E3 ≥ 18/20 required — met (20/20 each).
+
 ## Suggested Review Order
 
-(after implementation)
+1. `src/paperpilot/retrieval/retriever.py` — `Retriever.from_config`, `retrieve` (timings, hydration, pack assembly)
+2. `src/paperpilot/retrieval/fusion.py` — `rrf` (tie rule, per-leg scores)
+3. `src/paperpilot/retrieval/sparse.py` — `Bm25sRetriever.search` (score > 0, exact `(-score, row)` cut)
+4. `src/paperpilot/retrieval/dense.py` — `FaissDenseRetriever.build/search`, `SentenceTransformerEncoder`
+5. `src/paperpilot/retrieval/manifest.py` — `check_manifest`, `atomic_component`
+6. `src/paperpilot/retrieval/docstore.py` — `build_docstore`, `Docstore.hydrate`
+7. `src/paperpilot/core/config.py`, `core/schemas.py` — `RetrievalConfig` + loader, `EvidencePack`, `IndexManifest`
+8. `src/paperpilot/retrieval/cli.py`, `pyproject.toml` (torch CPU index)

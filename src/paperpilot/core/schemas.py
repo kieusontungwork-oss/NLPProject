@@ -7,7 +7,7 @@ no Paper ever carrying null title/authors/year/categories — the models enforce
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 HEX16_PATTERN = r"^[0-9a-f]{16}$"
 
@@ -78,3 +78,83 @@ class KBStats(BaseModel):
     year_histogram: dict[str, int]
     category_composition: CategoryComposition
     provenance: Provenance
+
+
+# --- Story 1.3 · CAP-2 · spine AD-3 (EvidencePack) and AD-5 (index manifests) ---
+
+
+class LegScores(BaseModel):
+    """Per-leg raw scores of a hit; null where the leg did not return the chunk (E-8, E-10)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    bm25: float | None = None
+    dense: float | None = None
+
+
+class Hit(BaseModel):
+    """One ranked evidence hit (AD-3); `rrf_score` is the deliberate v1 fused-score field."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rank: int = Field(ge=1)
+    chunk_id: str
+    text: str
+    header_prefix: str
+    arxiv_id: str
+    title: str
+    section_name: str
+    year: int
+    source_link: str
+    leg_scores: LegScores
+    rerank_score: float | None = None
+    rrf_score: float
+
+
+class EffectiveQuery(BaseModel):
+    """A query actually sent to the legs; in story 1.3 always `type == "raw"`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: str
+    text: str
+    legs: list[str]
+
+
+class Gate(BaseModel):
+    """Answer-gate flags (semantics owned by later stories); defaults mean 'not evaluated'."""
+
+    model_config = ConfigDict(frozen=True)
+
+    score_gate_fired: bool = False
+    generator_declared: bool | None = None
+
+
+class EvidencePack(BaseModel):
+    """The retrieval -> generation contract (AD-3). Additive-only changes bump `pack_version`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pack_version: int = 1
+    query_id: str
+    query: str
+    effective_queries: list[EffectiveQuery]
+    hits: list[Hit]
+    stage_timings_ms: dict[str, float]
+    gate: Gate = Field(default_factory=Gate)
+
+
+class IndexManifest(BaseModel):
+    """manifest.json of one index component (AD-5, class 3).
+
+    `embedding_model` and `dim` are null for the sparse and docstore components.
+    """
+
+    created: str
+    embedding_model: str | None
+    dim: int | None
+    chunk_store_hash: str
+    config_row: str
+    engine: str
+    n_chunks: int = Field(ge=0)
+    params: dict

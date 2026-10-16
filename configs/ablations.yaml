@@ -1,0 +1,16 @@
+# Retrieval ablation rows (AD-4, class 1: human-written, never machine-overwritten).
+# Validated at load by paperpilot.core.config.RetrievalConfig; unknown keys are rejected.
+# Defaults (rrf_k, candidate_depth, sparse_engine, embedding_model) live only in the model.
+rows:
+  - id: E1
+    description: BM25 only
+    use_sparse: true
+    use_dense: false
+  - id: E2
+    description: Dense only
+    use_sparse: false
+    use_dense: true
+  - id: E3
+    description: Hybrid BM25 + dense, RRF
+    use_sparse: true
+    use_dense: true
