@@ -1,7 +1,7 @@
 ---
 story: '1.3'
 slug: baseline-retrieval
-status: in-progress
+status: done
 baseline_commit: 1d5885b16a7c42cf27dbb12931a742b2aabc86cd
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-NLPProject-2026-10-12/ARCHITECTURE-SPINE.md
@@ -206,3 +206,7 @@ Post-review patches first: `retrieval/manifest.py` `atomic_component` (P2), `ret
 6. `src/paperpilot/retrieval/docstore.py` — `build_docstore`, `Docstore.hydrate`
 7. `src/paperpilot/core/config.py`, `core/schemas.py` — `RetrievalConfig` + loader, `EvidencePack`, `IndexManifest`
 8. `src/paperpilot/retrieval/cli.py`, `pyproject.toml` (torch CPU index)
+
+## GitHub Links
+
+- PR: #3
