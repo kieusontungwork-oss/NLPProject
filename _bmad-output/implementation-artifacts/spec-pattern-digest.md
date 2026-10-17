@@ -46,3 +46,9 @@ Full invariants live in the spine (AD-1…AD-6) — this digest condenses; the s
 - Mid-build contract changes need owner approval and a dated Spec Change Log entry with a "KEEP:" line.
 - House spec ends with an "Acceptance run record" on the real corpus (figures + peak RSS).
 - Real KB (cs.*, train+val+test): 12,350 papers, 271,171 chunks (max 561 tokens), years 1994–2017; build peak RSS ~2.6GB.
+
+## Patterns minted by story 1.3
+- Engine boundaries are core ports; adapters live in their layer; engine/model ids are config-row values.
+- Every index component: manifest + atomic temp-sibling swap (stale siblings swept, orphaned `.old` restored); loaders refuse on chunk-store hash, model, engine, params (incl. tokenizer fingerprint) or size mismatch.
+- Expensive resources (models) load only after cheap integrity checks pass; long builds log progress.
+- Real indexes: `make index` ~1.5h on CPU (dense dominates); serving E3 p50 ~54ms, cold start ~3.8s.
