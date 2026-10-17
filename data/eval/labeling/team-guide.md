@@ -35,13 +35,13 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ## 3. Who does what
 
-| ID | Name (coordinator fills in) | Subgroup | Role |
-| --- | --- | --- | --- |
-| P1 | | A | **Coordinator** + writer + labeler |
-| P2 | | | Writer + labeler |
-| P3 | | | Writer + labeler |
-| P4 | | | Writer + labeler |
-| P5 | | | Writer + labeler |
+| ID | Name (coordinator fills in) | Subgroup | Role                                     |
+| -- | --------------------------- | -------- | ---------------------------------------- |
+| P1 |                             | A        | **Coordinator** + writer + labeler |
+| P2 |                             |          | Writer + labeler                         |
+| P3 |                             |          | Writer + labeler                         |
+| P4 |                             |          | Writer + labeler                         |
+| P5 |                             |          | Writer + labeler                         |
 
 - **Everyone (P1–P5)** writes questions, labels passages, writes gold answers, and reviews a few of other people's items.
 - **The coordinator (P1)**:
@@ -76,28 +76,28 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ## 5. Timeline
 
-| Date | Step | What you do | Time needed |
+| Step | What you do | Start date | End date (deadline) |
 | --- | --- | --- | --- |
-| Sat 17 Oct | Kickoff meeting | Agree on IDs and roles; read this guide | 30 min |
-| Sun 18 – Mon 19 Oct | **Step 1: write questions** | Write 50 answerable + 20 unanswerable questions | ~5–6 h |
-| Tue 20 Oct | Coordinator checks questions | Fix anything the coordinator flags | ~30 min |
-| Tue 20 – Wed 21 Oct | **Step 2: pilot** | Label ~100 passages (same sheet for everyone) | ~1 h |
-| Thu 22 Oct | Agreement result | ≥80% → go. Below → 30-min fix meeting, then a second pilot | — |
-| Thu 22 – Sun 25 Oct | **Step 3: main labeling** | Label ~1,100 passages | ~8 h (≈2 h/day) |
-| Thu 22 – Sun 25 Oct | **Step 4: check unanswerable** | One yes/no per unanswerable question | ~1 h |
-| Mon 26 Oct | Disagreement meeting | Decide the disagreements together | 1 h |
-| Mon 26 – Tue 27 Oct | **Step 5: gold answers** | One-sentence answer for each of your 50 questions + review a few of others' | ~3 h |
-| Tue 27 – Wed 28 Oct | **Step 6: round 2** | Label extra passages found by the improved search | ~3 h |
-| Thu 29 Oct | Coordinator merges | Final files + scores re-run | — |
-| Fri 30 Oct | **Freeze** | No more changes | — |
+| Kickoff meeting | Agree on IDs and roles; read this guide | Sat 17 Oct | Sat 17 Oct |
+| **Step 1: write questions** | Write 50 answerable + 20 unanswerable questions | Sat 17 Oct | Sun 18 Oct |
+| Fix flagged questions | The coordinator checks all questions; fix anything flagged | Mon 19 Oct | Mon 19 Oct |
+| **Step 2: pilot** | Label ~100 passages (same sheet for everyone) | Mon 19 Oct | Tue 20 Oct |
+| Agreement result | ≥80% → go. Below → 30-min fix meeting, then a second pilot on Wed 21 Oct | Tue 20 Oct | Tue 20 Oct |
+| **Step 3: main labeling** | Label ~1,100 passages | Tue 20 Oct | Thu 22 Oct |
+| **Step 4: check unanswerable** | One yes/no per unanswerable question | Tue 20 Oct | Wed 21 Oct |
+| Disagreement meeting | Decide the disagreements together | Fri 23 Oct | Fri 23 Oct |
+| **Step 5: gold answers** | One-sentence answer for each of your 50 questions (Fri), then review a few of others' (Sat) | Fri 23 Oct | Sat 24 Oct |
+| **Step 6: round 2** | Label extra passages found by the improved search (only if Story 1.5 is ready; otherwise it is scheduled separately) | Sat 24 Oct | Sat 24 Oct |
+| Coordinator merges | Final files + scores re-run | Sat 24 Oct | Sat 24 Oct |
 
-- Total: about **20 hours per person** over two weeks.
+- Total: about **20 hours per person** in one week, so plan for **about 3 hours every day**.
+- The project freeze is **Fri 30 Oct**. Finishing labels by Sat 24 Oct leaves time to fix problems.
 - Deadlines are **end of day (23:59)**. If you will be late, tell the coordinator **before** the deadline.
 - If we fall behind, we cut other work, never labels.
 
 ---
 
-## 6. Step 1 — Write questions (Sun 18 – Mon 19 Oct)
+## 6. Step 1 — Write questions (Sat 17 – Sun 18 Oct)
 
 ### What you get
 
@@ -108,38 +108,34 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ### Columns
 
-| Column | What to write |
-| --- | --- |
-| `query_id` | Already filled. Do not change. |
-| `question` **(fill)** | Your question, one sentence, ending with `?` |
-| `type` **(fill)** | Pick from the dropdown (see below). Answerable rows only. |
-| `subfield` **(fill)** | Pick from the dropdown (see below). Answerable rows only. |
+| Column                            | What to write                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `query_id`                      | Already filled. Do not change.                                                               |
+| `question` **(fill)**     | Your question, one sentence, ending with `?`                                               |
+| `type` **(fill)**         | Pick from the dropdown (see below). Answerable rows only.                                    |
+| `subfield` **(fill)**     | Pick from the dropdown (see below). Answerable rows only.                                    |
 | `source_paper` **(fill)** | arXiv id of the paper that inspired the question, e.g. `1502.02478`. Answerable rows only. |
-| `comment` | Optional note |
+| `comment`                       | Optional note                                                                                |
 
 ### Your quota (answerable, 50 questions)
 
 - **By type** (what kind of question):
-
-  | Type | Count | What it means | Example |
-  | --- | --- | --- | --- |
-  | `terminology-mismatch` | 15 | Ask with **different words** than the paper uses | Paper says "dropout"; you ask "Why does randomly switching off neurons during training help a network generalize?" |
-  | `exact-term` | 15 | Use the paper's **exact technical name** | "What is batchwise dropout?" |
-  | `survey` | 10 | Ask for an **overview** of a topic | "What methods exist for detecting communities in social networks?" |
-  | `comparison` | 10 | Ask to **compare** two things | "How does neural machine translation compare with phrase-based translation in quality?" |
-
+  | Type                     | Count | What it means                                          | Example                                                                                                            |
+  | ------------------------ | ----- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+  | `terminology-mismatch` | 15    | Ask with **different words** than the paper uses | Paper says "dropout"; you ask "Why does randomly switching off neurons during training help a network generalize?" |
+  | `exact-term`           | 15    | Use the paper's **exact technical name**         | "What is batchwise dropout?"                                                                                       |
+  | `survey`               | 10    | Ask for an **overview** of a topic               | "What methods exist for detecting communities in social networks?"                                                 |
+  | `comparison`           | 10    | Ask to **compare** two things                    | "How does neural machine translation compare with phrase-based translation in quality?"                            |
 - **By subfield** (topic area). These numbers follow what our library actually contains:
-
-  | Subfield | Count |
-  | --- | --- |
-  | Machine learning & AI | 10 |
-  | NLP & IR | 8 |
-  | Computer vision | 7 |
-  | Information theory & signals | 7 |
-  | Algorithms & theory | 7 |
-  | Networks & social | 6 |
-  | Systems, security & data | 5 |
-
+  | Subfield                     | Count |
+  | ---------------------------- | ----- |
+  | Machine learning & AI        | 10    |
+  | NLP & IR                     | 8     |
+  | Computer vision              | 7     |
+  | Information theory & signals | 7     |
+  | Algorithms & theory          | 7     |
+  | Networks & social            | 6     |
+  | Systems, security & data     | 5     |
 - Any type can go with any subfield. Just make the totals match.
 
 ### How to write a good answerable question
@@ -186,41 +182,42 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 ### When you are done
 
 - Check that all 70 rows have a question, and the 50 answerable rows have type, subfield and source paper.
-- Write "done" in the team chat. The coordinator checks the sheets on Tue 20 Oct and may ask you to fix a few rows (duplicates, wrong year, unclear wording).
+- Write "done" in the team chat. The coordinator checks the sheets on Mon 19 Oct and may ask you to fix a few rows (duplicates, wrong year, unclear wording).
 
 ---
 
-## 7. Step 2 — Pilot (Tue 20 – Wed 21 Oct)
+## 7. Step 2 — Pilot (Mon 19 – Tue 20 Oct)
 
 - **Goal:** check that we all label the same way **before** the big round.
 - Everyone gets the **same** sheet with about 100 rows (5 questions × ~20 passages).
 - Label **alone**. Do not discuss the pilot rows with anyone until the coordinator says so.
 - Columns:
 
-  | Column | Meaning |
-  | --- | --- |
-  | `row_id` | Row number. Do not change. |
-  | `query_id`, `question` | The question |
-  | `passage_id` | The passage's id. Do not change. |
-  | `paper_title`, `section`, `year` | Where the passage comes from |
-  | `passage` | The passage text — read this |
-  | `relevance` **(fill)** | `2`, `1` or `0` (see `guidelines.md`) |
-  | `comment` | Optional: why you were unsure |
-
+  | Column                                 | Meaning                                       |
+  | -------------------------------------- | --------------------------------------------- |
+  | `row_id`                             | Row number. Do not change.                    |
+  | `query_id`, `question`             | The question                                  |
+  | `passage_id`                         | The passage's id. Do not change.              |
+  | `paper_title`, `section`, `year` | Where the passage comes from                  |
+  | `passage`                            | The passage text — read this                 |
+  | `relevance` **(fill)**         | `2`, `1` or `0` (see `guidelines.md`) |
+  | `comment`                            | Optional: why you were unsure                 |
 - How to label one row:
+
   1. Read the question. Ask yourself: "What would a good answer contain?"
   2. Read the passage.
   3. Give **2** if it contains (part of) a real answer, **1** if it is on-topic but does not answer, **0** if it does not help. Details and examples are in `guidelines.md`.
   4. Unsure between two numbers? Pick the lower one and write a short `comment`.
 - Ignore odd symbols in the text such as `@xcite`, `@xmath3`, `<S>`, `</S>`. They are leftovers from the PDF conversion.
 - Passages are in random order. Do not try to guess which search method found them.
-- **Result (Thu 22 Oct):**
+- **Result (Tue 20 Oct):**
+
   - If we agree on ≥80% of rows → we start the main round.
-  - If not → 30-minute meeting to look at the disagreements, the coordinator updates `guidelines.md`, and we do a second short pilot (Thu–Fri).
+  - If not → 30-minute meeting to look at the disagreements, the coordinator updates `guidelines.md`, and we do a second short pilot on Wed 21 Oct.
 
 ---
 
-## 8. Step 3 — Main labeling (Thu 22 – Sun 25 Oct)
+## 8. Step 3 — Main labeling (Tue 20 – Thu 22 Oct)
 
 - Your sheet `3-sprint/P<your ID>` has about **1,100 rows**. Same columns and same rules as the pilot.
 - You will **not** get passages for your own questions (it keeps the labels independent).
@@ -229,12 +226,12 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
   - Work in blocks of 30–45 minutes, then take a break. Tired labeling is bad labeling.
   - Aim for about 25 seconds per row. Read the question first; often the first two lines of the passage are enough to decide **0**.
   - Rows are grouped by question, so you read each question once for ~20 passages.
-  - Aim for ~300 rows per day.
+  - Aim for about 370 rows per day (3 days).
 - Before the deadline, check: every row has `2`, `1` or `0` in `relevance` (no blanks, no other values).
 
 ---
 
-## 9. Step 4 — Check your unanswerable questions (Thu 22 – Sun 25 Oct)
+## 9. Step 4 — Check your unanswerable questions (Tue 20 – Wed 21 Oct)
 
 - Your sheet `4-unanswerable-check/P<your ID>` has your 20 unanswerable questions. Each question shows the **10 passages** our system finds for it.
 - For each question, fill **one** cell:
@@ -244,7 +241,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ---
 
-## 10. Step 5 — Gold answers (Mon 26 – Tue 27 Oct)
+## 10. Step 5 — Gold answers (Fri 23 – Sat 24 Oct)
 
 - Your sheet `5-gold-answers/P<your ID>` lists your 50 answerable questions.
 - For each question you see the passages people marked **2**.
@@ -256,7 +253,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ---
 
-## 11. Step 6 — Round 2 (Tue 27 – Wed 28 Oct)
+## 11. Step 6 — Round 2 (Sat 24 Oct, if Story 1.5 is ready)
 
 - After Subgroup B finishes the improved search (Story 1.5), it finds some passages nobody has judged yet.
 - You get a short sheet (~300–500 rows) with only those new passages. Same columns, same rules as Step 3.
@@ -282,7 +279,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 - [ ] Fill in the names in section 3.
 - [ ] Upload `team-guide.md`, `guidelines.md`, `papers_catalog.csv` to `0-read-me/`.
 - [ ] Create the five question sheets from `questions_template.csv`; add dropdowns for `type` and `subfield` (Data → Data validation).
-- [ ] Tue 20 Oct: download the question sheets as CSV, run the question check, send fix requests.
+- [ ] Mon 19 Oct: download the question sheets as CSV, run the question check, send fix requests.
 - [ ] Generate and upload the pilot sheets; collect them; run the agreement check.
 - [ ] Generate and upload the sprint and unanswerable-check sheets.
 - [ ] Collect sheets at each deadline (File → Download → CSV), run the checks, commit the CSVs to `data/eval/labeling/raw/`.
@@ -290,4 +287,5 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 - [ ] Generate gold-answer sheets; collect; run the final merge and validation.
 - [ ] Round 2 when Story 1.5 is ready.
 - [ ] Write `agreement-report.md` and commit everything.
+
 - The exact commands for each step are in `coordinator-commands.md` (added with the labeling tools).
