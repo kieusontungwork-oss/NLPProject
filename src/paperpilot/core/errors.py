@@ -1,6 +1,6 @@
 """Typed exception hierarchy (house convention: stage base RuntimeError with actionable messages).
 
-Story 1.2 · CAP-1 · spine AD-1 (core layer owns shared contracts).
+Story 1.2 · CAP-1 · spine AD-1 (core layer owns shared contracts); Story 1.6 adds LabelingStageError.
 """
 
 from __future__ import annotations
@@ -55,3 +55,11 @@ class IndexMismatchError(RetrievalStageError):
             f"index {what} mismatch: expected {expected!r}, found {found!r}; run `make index`",
         )
         self.what = what
+
+
+class LabelingStageError(PaperPilotError):
+    """A labeling-sprint stage failed (catalog/sheets/pooling/agreement/merge) — exit code 3 path."""
+
+    def __init__(self, stage: str, message: str) -> None:
+        super().__init__(f"[labeling/{stage}] {message}")
+        self.stage = stage

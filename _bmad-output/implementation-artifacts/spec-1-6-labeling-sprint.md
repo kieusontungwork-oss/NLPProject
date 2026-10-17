@@ -112,6 +112,7 @@ tests/evaluation/                                  # local only
 
 - 2026-10-17: Initial frozen block (in-session). Deviations from `evaluation-plan.md`, all for the owner's review: (1) round-1 pool = top-**10** union of E1/E2/E3 (~19/question, ~4,750 judgments) instead of top-20 (~36/question, ~9,000) — keeps judged@10 = 100% for the baselines at half the effort; (2) question rows live in `queries.jsonl`, not inside `qrels.jsonl`; (3) the IAA gate is defined as mean pairwise raw agreement on 0/1/2, κ reported; (4) 5 annotators, so agreement is pairwise. `story6-labeling-pack-prompt.md` is superseded (it predates the 100-question slice and the 2017 corpus end).
 - 2026-10-17: Spec checkpoint passed — owner approved the frozen block, including deviations (1)–(4). KEEP: top-10 union pool; 15% whole-question double-labeling; gate = mean pairwise raw agreement ≥ 80%; teammates never run code.
+- 2026-10-17: Build amendments (tooling). (a) Label resolution for multi-labeled pairs: adjudication row if present, else unanimous, else strict majority, else an adjudication row is required (E-4); pilot rows (5 labels) usually resolve by majority. (b) Round-1 assignment processes questions round-robin across authors (`P1-001, P2-001, …`) instead of sorted query_id order: in sorted order the last author's questions starve one annotator (−16.5% load on a 245-question synthetic run, failing the ±5% guard); round-robin gives ±2%. (c) Display text in sheets strips the header prefix and `<S>`/`</S>` markers (display only). (d) Unanswerable adjudication rows use `chunk_id = UNANSWERABLE` with `final_relevance` yes/no; replacement questions take ids `P<n>-U21…` and are re-checked with `unanswerable-sheets --only`. (e) A second pilot archives the first pilot's folders and its questions return to round 1. (f) `agreement` exits 0 on a FAIL verdict (the verdict is printed); exit 1 is for malformed sheets. (g) The labeling timeline was compressed to one week (17–24 Oct) at the owner's request; round 2 waits for story 1.5. KEEP: round-robin assignment; teammates never run code; the resolution rule is identical in merge, gold-sheets and validate.
 
 ## Design Notes
 
@@ -127,4 +128,9 @@ tests/evaluation/                                  # local only
 
 ## Suggested Review Order
 
-(after implementation)
+1. `src/paperpilot/evaluation/labeling/pooling.py` — pool union, shuffle, `interleaved_order`, assignment and load guard
+2. `src/paperpilot/evaluation/labeling/merge.py` — label resolution, adjudication, unanswerable slice + split, gold checks, JSONL writers
+3. `src/paperpilot/evaluation/labeling/agreement.py` — raw agreement, Cohen's κ, gate
+4. `src/paperpilot/evaluation/labeling/sheets.py` — CSV schemas, round-trip checks, `check-questions`
+5. `src/paperpilot/evaluation/labeling/cli.py`, `subfields.py`, `core/errors.py`
+6. `data/eval/labeling/coordinator-commands.md`
