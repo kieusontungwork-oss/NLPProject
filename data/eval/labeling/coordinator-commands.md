@@ -93,7 +93,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli check-
 - Send each person the error lines for their file. Wait for the fix, download again, run again. Repeat until exit 0.
 - When it passes, commit `data/eval/labeling/raw/questions/`.
 
-## 3. Pilot — Mon 19 – Tue 20 Oct (Step 2) and the gate on Tue 20 Oct (second pilot, if needed, Wed 21 Oct)
+## 3. Pilot — Mon 19 – Tue 20 Oct (Step 2) and the gate on Tue 20 Oct, evening (second pilot, if needed, Wed 21 Oct)
 
 ```
 source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli pilot --auto 5
@@ -124,7 +124,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli agreem
 - A person whose sheet is missing is not a crash: their pairs are skipped with a `warning: pair … has no rows labeled by both`.
 - Pilot rows where nobody wins a majority need an adjudication row (see section 6). Commit `raw/pilot/` when done.
 
-## 4. Main labeling — Tue 20 – Thu 22 Oct (Step 3)
+## 4. Main labeling — Wed 21 – Fri 23 Oct (draft the sheets only after the pilot gate passes) (Step 3)
 
 ```
 source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli sheets --round 1
@@ -171,7 +171,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli agreem
   4. A replacement question joins the slice when its answer is `no`. Until then it is listed as `not yet checked` and the slice count stays below 100.
 - If the author says `no` and the double-checker says `yes` (or the reverse), you need an adjudication row for it (section 6, key `UNANSWERABLE`).
 
-## 6. Disagreement meeting and adjudication — Fri 23 Oct
+## 6. Disagreement meeting and adjudication — Sat 24 Oct (weekly meeting)
 
 - List what is open:
 
@@ -193,7 +193,7 @@ P3-U05,UNANSWERABLE,no,P2,"no passage answers it"
 - Run `validate` again until the adjudication warnings are gone. Commit `adjudication.csv`.
 - Mistakes are reported with `file:row` (`final_relevance '3'`, `adjudicator 'P9'`, `duplicate adjudication`).
 
-## 7. Gold answers — Fri 23 – Sat 24 Oct (Step 5)
+## 7. Gold answers — Sat 24 – Sun 25 Oct 12:00; review sheets out Sun afternoon, back by Mon 26 Oct 09:00 (Step 5)
 
 Gold sheets need the round-1 labels to be complete (no adjudication row missing). If one is missing the command stops with exit 1 and lists the pairs.
 
@@ -218,7 +218,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli gold-s
 - Run `agreement --stage gold-review` (reviewer against the answer's author) and `validate`. Every `disagree` is listed as a warning with its reason: settle them in a short meeting and, if needed, ask the author to update the gold sheet (download and save again).
 - Commit `raw/gold/` and `raw/gold-review/`.
 
-## 8. Round 2 — Sat 24 Oct (Step 6, needs Story 1.5)
+## 8. Round 2 — Sat 24 – Sun 25 Oct (Step 6, needs Story 1.5)
 
 Save the round-1 and pilot sheets in `raw/` first (the command reads them). Then, with the config rows from Story 1.5 (names as in `configs/ablations.yaml`):
 
@@ -231,7 +231,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling.cli sheets
 - **FAIL:** exit 3 with `unknown config row` (check the ids in `configs/ablations.yaml`), `--rows` missing, or `no returned … sheets` (save the earlier sheets first).
 - Upload `reports/pooling/round2/P<n>.csv` to Drive `6-round2/`. Collect → `data/eval/labeling/raw/round2/P<n>.csv`. Check with `validate` and `agreement --stage round2`. Commit `raw/round2/`.
 
-## 9. Final merge — Sat 24 Oct
+## 9. Final merge — Mon 26 Oct
 
 1. Check everything is in place:
 

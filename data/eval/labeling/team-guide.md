@@ -82,17 +82,19 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 | **Step 1: write questions** | Write 50 answerable + 20 unanswerable questions | Sat 17 Oct | Sun 18 Oct |
 | Fix flagged questions | The coordinator checks all questions; fix anything flagged | Mon 19 Oct | Mon 19 Oct |
 | **Step 2: pilot** | Label ~100 passages (same sheet for everyone) | Mon 19 Oct | Tue 20 Oct |
-| Agreement result | ≥80% → go. Below → 30-min fix meeting, then a second pilot on Wed 21 Oct | Tue 20 Oct | Tue 20 Oct |
-| **Step 3: main labeling** | Label ~1,100 passages | Tue 20 Oct | Thu 22 Oct |
+| Pilot result | ≥80% agreement → main labeling starts Wed. Below → short fix call + second pilot on Wed 21 Oct, and main labeling starts Thu 22 Oct | Tue 20 Oct | Tue 20 Oct |
 | **Step 4: check unanswerable** | One yes/no per unanswerable question | Tue 20 Oct | Wed 21 Oct |
-| Disagreement meeting | Decide the disagreements together | Fri 23 Oct | Fri 23 Oct |
-| **Step 5: gold answers** | One-sentence answer for each of your 50 questions (Fri), then review a few of others' (Sat) | Fri 23 Oct | Sat 24 Oct |
-| **Step 6: round 2** | Label extra passages found by the improved search (only if Story 1.5 is ready; otherwise it is scheduled separately) | Sat 24 Oct | Sat 24 Oct |
-| Coordinator merges | Final files + scores re-run | Sat 24 Oct | Sat 24 Oct |
+| **Step 3: main labeling** | Label ~1,100 passages (starts only after the pilot passes) | Wed 21 Oct | Fri 23 Oct |
+| Disagreement meeting | At our weekly Saturday meeting: decide the disagreements together | Sat 24 Oct | Sat 24 Oct |
+| **Step 5: gold answers** | One-sentence answer for each of your 50 questions | Sat 24 Oct | **Sun 25 Oct, 12:00 (noon)** |
+| **Step 6: round 2** | Label extra passages found by the improved search (only if Story 1.5 is ready; otherwise it is scheduled separately) | Sat 24 Oct | Sun 25 Oct |
+| **Report back** | Review ~8 gold answers written by others, then confirm in the team chat that all your sheets are done | Sun 25 Oct (afternoon) | **Mon 26 Oct, morning (09:00)** |
+| Coordinator merges | Final files + scores re-run | Mon 26 Oct | Mon 26 Oct |
 
-- Total: about **20 hours per person** in one week, so plan for **about 3 hours every day**.
-- The project freeze is **Fri 30 Oct**. Finishing labels by Sat 24 Oct leaves time to fix problems.
-- Deadlines are **end of day (23:59)**. If you will be late, tell the coordinator **before** the deadline.
+- Steps 3 and 4 are listed in the order they start: the unanswerable check starts first because it does not depend on the pilot.
+- Total: about **20 hours per person** in nine days, so plan for **2–3 hours every day**.
+- The project freeze is **Fri 30 Oct**. Finishing labels by Mon 26 Oct leaves time to fix problems.
+- Deadlines are **end of day (23:59)** unless a time is given (gold answers: Sun 12:00; report back: Mon 09:00). If you will be late, tell the coordinator **before** the deadline.
 - If we fall behind, we cut other work, never labels.
 
 ---
@@ -210,14 +212,14 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
   4. Unsure between two numbers? Pick the lower one and write a short `comment`.
 - Ignore odd symbols in the text such as `@xcite`, `@xmath3`, `<S>`, `</S>`. They are leftovers from the PDF conversion.
 - Passages are in random order. Do not try to guess which search method found them.
-- **Result (Tue 20 Oct):**
+- **Result (Tue 20 Oct, evening):**
 
-  - If we agree on ≥80% of rows → we start the main round.
-  - If not → 30-minute meeting to look at the disagreements, the coordinator updates `guidelines.md`, and we do a second short pilot on Wed 21 Oct.
+  - If we agree on ≥80% of rows → the main labeling sheets go out and you start on Wed 21 Oct.
+  - If not → 30-minute meeting to look at the disagreements, the coordinator updates `guidelines.md`, and we do a second short pilot on Wed 21 Oct. The main labeling then starts on Thu 22 Oct.
 
 ---
 
-## 8. Step 3 — Main labeling (Tue 20 – Thu 22 Oct)
+## 8. Step 3 — Main labeling (Wed 21 – Fri 23 Oct)
 
 - Your sheet `3-sprint/P<your ID>` has about **1,100 rows**. Same columns and same rules as the pilot.
 - You will **not** get passages for your own questions (it keeps the labels independent).
@@ -226,7 +228,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
   - Work in blocks of 30–45 minutes, then take a break. Tired labeling is bad labeling.
   - Aim for about 25 seconds per row. Read the question first; often the first two lines of the passage are enough to decide **0**.
   - Rows are grouped by question, so you read each question once for ~20 passages.
-  - Aim for about 370 rows per day (3 days).
+  - Aim for about 370 rows per day (3 days). If the pilot had to be repeated, you have 2 days (about 550 rows per day): tell the coordinator early if that is too much.
 - Before the deadline, check: every row has `2`, `1` or `0` in `relevance` (no blanks, no other values).
 
 ---
@@ -241,7 +243,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ---
 
-## 10. Step 5 — Gold answers (Fri 23 – Sat 24 Oct)
+## 10. Step 5 — Gold answers (Sat 24 – Sun 25 Oct 12:00; reviews by Mon 26 Oct 09:00)
 
 - Your sheet `5-gold-answers/P<your ID>` lists your 50 answerable questions.
 - For each question you see the passages people marked **2**.
@@ -253,7 +255,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ---
 
-## 11. Step 6 — Round 2 (Sat 24 Oct, if Story 1.5 is ready)
+## 11. Step 6 — Round 2 (Sat 24 – Sun 25 Oct, if Story 1.5 is ready)
 
 - After Subgroup B finishes the improved search (Story 1.5), it finds some passages nobody has judged yet.
 - You get a short sheet (~300–500 rows) with only those new passages. Same columns, same rules as Step 3.
