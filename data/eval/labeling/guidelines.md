@@ -28,65 +28,91 @@ Ask one question: **"If I were writing the answer, would I use this passage?"**
 - **Numbers and tables.** A passage with only results (accuracy, tables) and no explanation → usually 1. If the question asks "how well does X work" and the passage gives that result → 2.
 - **The same text appears twice** (two passages from the same or different papers say the same thing) → give both the same label.
 - **Very short or broken passages** (mostly symbols like `@xmath12`) → 0, unless the readable part answers the question.
-- **Odd symbols** `@xcite`, `@xmath3`, `<S>`, `</S>`: ignore them. They are leftovers from converting the papers.
+- **Odd symbols** `@xcite`, `@xmath3`: ignore them. They stand for citations and formulas removed when the papers were converted to text.
 - **The passage answers a different question** on the same topic → 1.
 - **The passage disagrees with the expected answer** but discusses it directly (e.g. "dropout did not help in our case because…") → 2. It is still evidence.
 
 ---
 
-## 3. Worked examples (real passages from our library)
+## 3. Ten worked examples (real passages from our library)
 
-### Example A — "What is dropout and why does it reduce overfitting?"
+Examples 1–7 are passage judgments, 8–9 are unanswerable checks, 10 is a gold answer.
 
-- **Passage 1** — *Efficient batchwise dropout training using submatrices* (2015), section "independent versus batchwise dropout":
+### Question A — "What is dropout and why does it reduce overfitting?"
+
+- **Example 1** — *Efficient batchwise dropout training using submatrices* (2015), section "independent versus batchwise dropout":
   > "dropout is a technique to regularize artificial neural networks it prevents overfitting. a fully connected network with two hidden layers of 80 units each can learn to classify the mnist training set perfectly in about 20 training epochs unfortunately the test error is quite high…"
   - **Label: 2.** It says what dropout is (a regularization technique) and that it prevents overfitting, with an example of the overfitting problem.
-- **Passage 2** — same paper, abstract:
+- **Example 2** — same paper, abstract:
   > "dropout is a popular technique for regularizing artificial neural networks. dropout networks are generally trained by minibatch gradient descent with a dropout mask turning off some of the units…"
   - **Label: 2.** "turning off some of the units" explains what dropout does. Part of an answer is enough.
-- **Passage 3** — *No bad local minima…* (2016), discussion:
+- **Example 3** — *No bad local minima…* (2016), discussion:
   > "without data augmentation or dropout, alexnet did exhibit severe overfitting. our analysis is non-asymptotic…"
   - **Label: 1.** It links dropout and overfitting, but does not explain what dropout is or why it helps. (A **1 vs 2 boundary case**: if you are unsure, choose 1.)
-- **Passage 4** — *Deep Learning in Customer Churn Prediction…* (2017), related work:
+- **Example 4** — *Deep Learning in Customer Churn Prediction…* (2017), related work:
   > "…additionally to these regularization techniques, an early stopping mechanic can be implemented within a backpropagation algorithm…"
   - **Label: 0.** It is about early stopping, a different technique. Sharing the word "regularization" is not enough.
 
-### Example B — "How does attention help neural machine translation?"
+### Question B — "How does attention help neural machine translation?"
 
-- **Passage 1** — *Video Paragraph Captioning Using Hierarchical RNNs* (2015), related work:
+- **Example 5** — *Video Paragraph Captioning Using Hierarchical RNNs* (2015), related work:
   > "neural machine translation. the methods for nmt generally follow the encoder-decoder paradigm. an encoder maps the source sentence to a fixed-length feature vector in the embedding space. a decoder then conditions on this vector to generate a translated sentence…"
   - **Label: 1.** It explains the encoder–decoder setup (useful background) but does not say what attention adds.
-- **Passage 2** — *Can Active Memory Replace Attention?* (2016), abstract:
+- **Example 6** — *Can Active Memory Replace Attention?* (2016), abstract:
   > "several mechanisms to focus attention of a neural network on selected parts of its input or memory have been used successfully… attention has improved image classification, image captioning, speech recognition…"
   - **Label: 2.** "focus… on selected parts of its input" is the core of the answer (the decoder looks at the relevant source words), and it states that attention improved results.
-- **Passage 3** — *Can Active Memory Replace Attention?* (2016), introduction:
+- **Example 7** — *Can Active Memory Replace Attention?* (2016), introduction:
   > "…it by definition tries to focus on a single element of the memory it is attending to. in the extreme case, also known as hard attention, one of the memory elements is selected…"
   - **Label: 1.** It describes how attention works in general, but not how it helps translation. (If you think "focusing on one element" already answers *how*, write a comment — this is exactly the kind of case we discuss in the pilot meeting.)
 
-### Example C — an unanswerable question: "How does reinforcement learning from human feedback (RLHF) align large language models?"
+### Example 8 — an unanswerable question: "How does reinforcement learning from human feedback (RLHF) align large language models?"
 
 - The system's top passages are about "spin glass models of syntax", "word-to-word translation models" (1998) and "the One Billion Word benchmark" (2013).
 - None of them is about RLHF or aligning language models with human feedback (RLHF is a 2020s topic; our library ends in 2017).
 - **Check result:** `answered_by_library = no`. This is a good unanswerable question.
 
-### Example D — a question that looks unanswerable but is not: "How does a neural network decide which input words to focus on when translating?"
+### Example 9 — a question that looks unanswerable but is not: "How does a neural network decide which input words to focus on when translating?"
 
-- This is about attention in translation (2014–2016 work), which our library contains (see Example B).
+- This is about attention in translation (2014–2016 work), which our library contains (see Question B).
 - **Check result:** `answered_by_library = yes`, so replace it with a real post-2017 topic.
+
+
+### Example 10 — a gold answer (Step 5)
+
+- Question A again: "What is dropout and why does it reduce overfitting?"
+- Passages marked 2: Examples 1 and 2.
+- **Good gold answer:** "Dropout regularizes a neural network by randomly turning off units during training, which prevents the network from overfitting the training data." (one sentence, uses only what Examples 1–2 say)
+- `gold_passages`: the ids of Examples 1 and 2.
+- **Bad gold answers:**
+  - "Dropout, introduced by Srivastava et al. in 2014, randomly drops units with probability p = 0.5 …" ✗ (adds facts that are not in the passages)
+  - "According to the paper, it helps." ✗ (does not answer)
+- If no passage for a question was marked 2 → write `NO_EVIDENCE`.
 
 ---
 
 ## 4. Question-writing rules (Step 1)
 
+### Answerable questions
+
 - One sentence, ends with `?`, asked like a real researcher would ask it.
-- Answerable questions: topic from **2017 or earlier**; the answer fits in one or two sentences.
-- Unanswerable questions: topic from **2018 or later**, and the paper catalog has nothing on it; it should still sound like a normal research question.
+- Topic from **2017 or earlier**; the answer fits in one or two sentences.
+- No year of 2018 or later in the question.
 - No yes/no questions. No questions about one paper's exact numbers. Do not copy paper titles.
-- No near-duplicates: if your question is the same as another one with a few words changed, it is a duplicate.
+- No near-duplicates: if your question is the same as another one with a few words changed, it is a duplicate (the check flags questions that share 80% or more of their words).
 - Types: `terminology-mismatch`, `exact-term`, `survey`, `comparison` (definitions and examples are in `team-guide.md` §6).
 - Subfields: `Machine learning & AI`, `NLP & IR`, `Computer vision`, `Information theory & signals`, `Algorithms & theory`, `Networks & social`, `Systems, security & data`.
 
----
+### Unanswerable questions (how to build them)
+
+- **Goal:** a question that sounds like it belongs in our library, but that no passage can answer. The system should then say "not enough evidence" instead of inventing an answer.
+- **Pick a topic from 2018 or later.** Good sources: BERT, GPT-2/3/4, ChatGPT, RLHF, instruction tuning, prompt engineering, retrieval-augmented generation, diffusion models, vision transformers, CLIP, SimCLR/MAE, 5G/6G deployment, COVID-19 apps.
+- **Make it look normal.** Same style as an answerable question: one sentence, a real research question, about computer science.
+- **Check the catalog.** Search (Ctrl+F) the paper catalog for the topic's key words. If any paper is about the topic, choose another topic.
+- **Avoid giveaways.** Do not write "in 2023" or "recently released"; the topic itself should be what makes it unanswerable.
+- **No silly or off-topic questions** ("What is the capital of France?" ✗).
+- **Variety:** use at most two questions per topic in your 20, and spread them over different subfields.
+- **No near-duplicates** of anyone's questions, answerable or not.
+- **Step 4 checks each one:** you see the 10 passages the system finds; if any of them answers the question, you replace it (Examples 8 and 9).
 
 ## 5. Gold-answer rules (Step 5)
 
@@ -99,7 +125,7 @@ Ask one question: **"If I were writing the answer, would I use this passage?"**
 - Example:
   - Question: "What is dropout and why does it reduce overfitting?"
   - Gold answer: "Dropout regularizes a neural network by randomly turning off units during training, which prevents the network from overfitting the training data."
-  - Gold passages: the two passages marked 2 in Example A.
+  - Gold passages: Examples 1 and 2 (the two passages marked 2 for Question A).
 
 ---
 
