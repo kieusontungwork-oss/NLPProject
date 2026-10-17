@@ -1,8 +1,8 @@
 ---
 story: '1.6'
 slug: labeling-sprint
-status: spec-review
-baseline_commit: a650c70
+status: in-progress
+baseline_commit: f50e556
 context:
   - _bmad-output/planning-artifacts/architecture/architecture-NLPProject-2026-10-12/ARCHITECTURE-SPINE.md
   - _bmad-output/specs/spec-paperpilot-rag/evaluation-plan.md
@@ -111,6 +111,7 @@ tests/evaluation/                                  # local only
 ## Spec Change Log
 
 - 2026-10-17: Initial frozen block (in-session). Deviations from `evaluation-plan.md`, all for the owner's review: (1) round-1 pool = top-**10** union of E1/E2/E3 (~19/question, ~4,750 judgments) instead of top-20 (~36/question, ~9,000) — keeps judged@10 = 100% for the baselines at half the effort; (2) question rows live in `queries.jsonl`, not inside `qrels.jsonl`; (3) the IAA gate is defined as mean pairwise raw agreement on 0/1/2, κ reported; (4) 5 annotators, so agreement is pairwise. `story6-labeling-pack-prompt.md` is superseded (it predates the 100-question slice and the 2017 corpus end).
+- 2026-10-17: Spec checkpoint passed — owner approved the frozen block, including deviations (1)–(4). KEEP: top-10 union pool; 15% whole-question double-labeling; gate = mean pairwise raw agreement ≥ 80%; teammates never run code.
 
 ## Design Notes
 
