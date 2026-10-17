@@ -44,7 +44,7 @@ One row per artifact, from `merge_summary.json` → `artifacts.<key>`.
   - "double-labeled %" is the share of gold answers that got a review.
   - "raw agreement" is the share of reviews marked `agree`.
 - Passage-judgment agreement is computed over every pair of annotators who labeled the same row.
-  - In the pilot all five people labeled every row, so each pilot row counts once per pair.
+  - In the pilot all four people labeled every row, so each pilot row counts once per pair.
 - `null` in the JSON means "not applicable"; write `—`.
 
 ---

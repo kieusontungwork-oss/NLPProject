@@ -31,7 +31,7 @@ Teammates never run code. All commands run from the repository root.
 | Merge summary (fills `agreement-report.md`) | `reports/labeling/merge_summary.json` | `merge` |
 
 - Stage names (use exactly these as folder names): `questions`, `pilot`, `round1`, `round2`, `unanswerable`, `gold`, `gold-review`.
-- Annotator ids are fixed: `P1` … `P5`. The file for person `P3` must be called exactly `P3.csv`. Any other `.csv` in a stage folder (for example `Copy of P3.csv`) is ignored and reported as `warning: ignored ...`.
+- Annotator ids are fixed: `P1` … `P4`. The file for person `P3` must be called exactly `P3.csv`. Any other `.csv` in a stage folder (for example `Copy of P3.csv`) is ignored and reported as `warning: ignored ...`.
 - Do not delete `reports/pooling/`: the returned sheets are checked against the drafted ones. If it is lost, run the same drafting command again (it gives the same sheets), with `--force`.
 
 ### Do not re-draft a stage once sheets came back
@@ -72,7 +72,7 @@ The same rule is used by `merge`, `gold-sheets` and `validate`, for every (quest
 1. If an adjudication row exists for the pair in `adjudication.csv`, that decision is final (`adjudicated = true`).
 2. Otherwise, one label only: that label.
 3. All labels equal: that label.
-4. A strict majority (more than half of the labels): the majority label. (In the pilot, 5 people label every row, so a majority usually decides.)
+4. A strict majority (more than half of the labels): the majority label. (In the pilot, 4 people label every row, so a majority usually decides.)
 5. Anything else (a 1–1 split between two people, or a 2–2–1 split in the pilot): an **adjudication row is required**. `merge` stops (exit 1) and lists the missing pairs.
 
 ---
@@ -83,12 +83,12 @@ The same rule is used by `merge`, `gold-sheets` and `validate`, for every (quest
 source .venv/bin/activate && python -m paperpilot.evaluation.labeling catalog
 ```
 
-- Writes to `reports/labeling/kickoff/`: `papers_catalog.csv` and `questions_P1.csv` … `questions_P5.csv` (70 numbered rows each).
-- **PASS (exit 0):** the first line says `catalog ok: 12350 papers -> reports/labeling/kickoff`, then one line per subfield with its paper count, and the last line says `wrote questions_P1.csv .. questions_P5.csv (70 rows each)`.
+- Writes to `reports/labeling/kickoff/`: `papers_catalog.csv` and `questions_P1.csv` … `questions_P4.csv` (70 numbered rows each).
+- **PASS (exit 0):** the first line says `catalog ok: 12350 papers -> reports/labeling/kickoff`, then one line per subfield with its paper count, and the last line says `wrote questions_P1.csv .. questions_P4.csv (70 rows each)`.
 - **FAIL:** exit 3 with `paper metadata not found` → the KB is missing; run `make kb`.
 - Upload:
   - `papers_catalog.csv`, `team-guide.md`, `guidelines.md` → Drive `0-read-me/`.
-  - `questions_P1.csv` … `questions_P5.csv` → Drive `1-questions/` (one sheet per person, named `P1` … `P5`).
+  - `questions_P1.csv` … `questions_P4.csv` → Drive `1-questions/` (one sheet per person, named `P1` … `P4`).
 - Add the `type` and `subfield` dropdowns and the plain-text `source_paper` format (see section 0).
 
 ## 2. Question check — Mon 19 Oct (Step 1 in the team guide)
@@ -114,13 +114,13 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling check-ques
 ## 3. Pilot — Mon 19 – Tue 20 Oct (Step 2) and the gate on Tue 20 Oct, evening
 
 ```
-source .venv/bin/activate && python -m paperpilot.evaluation.labeling pilot --auto 5
+source .venv/bin/activate && python -m paperpilot.evaluation.labeling pilot --auto 4
 ```
 
-- Picks 5 answerable questions (`--auto N` accepts 1 to 5), each from a different author and from different subfields. To choose them yourself use `pilot --questions P1-004,P2-010,P3-021,P4-033,P5-007`.
-- **PASS:** `pilot ok: 5 questions (…), about 100 rows in each of 5 identical sheets`, exit 0.
+- Picks 4 answerable questions (`--auto N` accepts 1 to 4), each from a different author and from different subfields. To choose them yourself use `pilot --questions P1-004,P2-010,P3-021,P4-033`.
+- **PASS:** `pilot ok: 4 questions (…), about 80 rows in each of 4 identical sheets`, exit 0.
 - **FAIL:** exit 1 with `fix the question sheets first` → run section 2 again. Exit 3 with an index or KB message → run `make kb` / `make index`.
-- Upload `reports/pooling/pilot/P1.csv` … `P5.csv` to Drive `2-pilot/` (each person gets their own copy, named with their id; the content is the same). Add the `relevance` dropdown.
+- Upload `reports/pooling/pilot/P1.csv` … `P4.csv` to Drive `2-pilot/` (each person gets their own copy, named with their id; the content is the same). Add the `relevance` dropdown.
 - At the deadline download each sheet as CSV → `data/eval/labeling/raw/pilot/P<n>.csv`.
 
 Then run the gate:
@@ -152,8 +152,8 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling sheets --r
 ```
 
 - It refuses (exit 1) unless the pilot is drafted and **every** returned pilot sheet is in `raw/pilot/`.
-- Pool = top 10 of E1, E2 and E3 for every answerable question (pilot questions are left out). Nobody gets their own questions. 15% of the questions are given to a second person. The sheets are balanced across P1–P5.
-- **PASS:** a line with the number of questions, double-labeled questions and rows, then one line per person (`P3: 57 questions, 577 rows`), then `wrote 5 sheets -> reports/pooling/round1`. Exit 0.
+- Pool = top 10 of E1, E2 and E3 for every answerable question (pilot questions are left out). Nobody gets their own questions. 15% of the questions are given to a second person. The sheets are balanced across P1–P4.
+- **PASS:** a line with the number of questions, double-labeled questions and rows, then one line per person (`P3: 57 questions, 577 rows`), then `wrote 4 sheets -> reports/pooling/round1`. Exit 0.
 - **FAIL:** exit 1 with `load imbalance (> 5% from the mean)`: nothing is written. This should not happen; send the output to the owner instead of editing anything.
 - Upload `reports/pooling/round1/P<n>.csv` to Drive `3-sprint/`. Add the `relevance` dropdown.
 - At the deadline: download each sheet as CSV → `data/eval/labeling/raw/round1/P<n>.csv`.
@@ -203,7 +203,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling validate
 ```
 
 - The warning `N pair(s) need an adjudication row in adjudication.csv: (P1-007, 37b6…), …` lists every pair that two or more people labeled without a majority. The warning about `UNANSWERABLE` lists the unanswerable questions with disagreeing answers.
-- In the meeting, each person says their label and a one-sentence reason; a third person decides. The adjudicator must **not** be one of the people who labeled that pair (for unanswerable rows: not the author or the double-checker). The tools reject such a row. The only exception: a pilot row that all five people labeled, where anyone may decide.
+- In the meeting, each person says their label and a one-sentence reason; a third person decides. The adjudicator must **not** be one of the people who labeled that pair (for unanswerable rows: not the author or the double-checker). The tools reject such a row. The only exception: a pilot row that all four people labeled, where anyone may decide.
 - Record each decision as one row in `data/eval/labeling/adjudication.csv` (UTF-8 CSV, this exact header):
 
 ```
@@ -250,7 +250,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling sheets --r
 ```
 
 - Only (question, passage) pairs without a pilot, round-1 or round-2 judgment are drafted, from the top 10 of the rows you name.
-- **PASS:** a summary with the rows added per person and the cumulative load (round 1 + round 2); loads are balanced on the cumulative total and there is no 5% stop for round 2. Then `wrote 5 sheets -> reports/pooling/round2`. If every passage is already judged: `nothing to draft`, and no files.
+- **PASS:** a summary with the rows added per person and the cumulative load (round 1 + round 2); loads are balanced on the cumulative total and there is no 5% stop for round 2. Then `wrote 4 sheets -> reports/pooling/round2`. If every passage is already judged: `nothing to draft`, and no files.
 - **FAIL:** exit 3 with `unknown config row` (check the ids in `configs/ablations.yaml`), `--rows` missing, or `no returned … sheets` (save the earlier sheets first). Exit 1 with `returned sheet missing` → a pilot or round-1 sheet is not in `raw/`.
 - Upload `reports/pooling/round2/P<n>.csv` to Drive `6-round2/`. Collect → `data/eval/labeling/raw/round2/P<n>.csv`. Check with `validate` and `agreement --stage round2`. Once round 2 is drafted, every drafted sheet must come back before `merge`. Commit `raw/round2/`.
 - Order of work this weekend: `gold-sheets` first (it refuses to run while round-2 sheets are drafted but not back), then round 2, then `gold-sheets --review` after the round-2 sheets are in.
@@ -292,7 +292,7 @@ source .venv/bin/activate && python -m paperpilot.evaluation.labeling merge --re
 | --- | --- | --- | --- |
 | Kickoff | `catalog` | `0-read-me/`, `1-questions/` | — |
 | Question check | `check-questions` | — | `raw/questions/` |
-| Pilot | `pilot --auto 5`, then `agreement --stage pilot` | `2-pilot/` | `raw/pilot/` |
+| Pilot | `pilot --auto 4`, then `agreement --stage pilot` | `2-pilot/` | `raw/pilot/` |
 | Unanswerable | `unanswerable-sheets`, then `validate`, `agreement --stage unanswerable` | `4-unanswerable-check/` | `raw/unanswerable/` (replacements: `raw/unanswerable/replacements/`) |
 | Main labeling | `sheets --round 1`, then `validate`, `agreement --stage round1` | `3-sprint/` | `raw/round1/` |
 | Adjudication | write `adjudication.csv`, then `validate` | — | — |

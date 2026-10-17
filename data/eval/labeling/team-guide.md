@@ -1,6 +1,6 @@
 # PaperPilot labeling — team guide (Story 1.6)
 
-This guide tells all 5 of us what to do, when, and how. You do not need to know any code.
+This guide tells all 4 of us what to do, when, and how. You do not need to know any code.
 
 - Read this guide once, start to finish (about 15 minutes).
 - Keep `guidelines.md` (same folder) open while you label. It has the exact rules and examples.
@@ -43,9 +43,8 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 | P2  |                             |          | Writer + labeler               |
 | P3  |                             |          | Writer + labeler               |
 | P4  |                             |          | Writer + labeler               |
-| P5  |                             |          | Writer + labeler               |
 
-- **Everyone (P1–P5)** writes questions, labels passages, writes gold answers, and reviews a few of other people's items.
+- **Everyone (P1–P4)** writes questions, labels passages, writes gold answers, and reviews a few of other people's items.
 - **The coordinator (P1)**:
   - runs the scripts that create every spreadsheet you will fill in;
   - shares the spreadsheets in the shared Google Drive folder;
@@ -54,6 +53,8 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
   - commits the final files to GitHub.
 - **You never run code.** You only fill in Google Sheets.
 - Subgroups B and C keep coding their own stories in parallel. Everyone's labeling share is equal.
+
+
 
 ---
 
@@ -91,15 +92,15 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 | **Step 4: check unanswerable** | One yes/no per unanswerable question                                                 | Tue 20 Oct             | Wed 21 Oct                   |
 | **Step 3: main labeling**      | Label ~1,100 passages (starts only after the pilot passes)                           | Wed 21 Oct             | Fri 23 Oct                   |
 | Disagreement meeting           | At our weekly Saturday meeting: decide the disagreements together                    | Sat 24 Oct             | Sat 24 Oct                   |
-| **Step 5: gold answers**       | One-sentence answer for each of your 50 questions                                    | Sat 24 Oct             | **Sun 25 Oct, 12:00 (noon)** |
+| **Step 5: gold answers**       | One-sentence answer for each of your 50 questions                                    | Sat 24 Oct             | **Sun 25 Oct**               |
 | **Step 6: round 2**            | Label extra passages found by the improved search (only if Story 1.5 is ready)       | Sat 24 Oct             | Sun 25 Oct                   |
-| **Report back**                | Review ~8 gold answers written by others; confirm in the team chat that you are done | Sun 25 Oct (afternoon) | **Mon 26 Oct, 09:00**        |
+| **Report back**                | Review ~8 gold answers written by others; confirm in the team chat that you are done | Sun 25 Oct (afternoon) | **Mon 26 Oct**               |
 | Coordinator merges             | Final files + scores re-run                                                          | Mon 26 Oct             | Mon 26 Oct                   |
 
 - Steps 3 and 4 are listed in the order they start: the unanswerable check starts first because it does not depend on the pilot.
 - If Story 1.5 is not ready by Sat 24 Oct, round 2 is scheduled separately before the freeze.
 - Total: about **20 hours per person** in nine days, so plan for **2–3 hours every day**.
-- Deadlines are **end of day (23:59)** unless a time is given (gold answers: Sun 12:00; report back: Mon 09:00).
+- Deadlines are **end of day (23:59)** unless a specific time is agreed in the team chat.
 - If you will be late, tell the coordinator **before** the deadline.
 - The project freeze is **Fri 30 Oct**. Finishing labels by Mon 26 Oct leaves time to fix problems.
 - If we fall behind, we cut other work, never labels.
@@ -289,7 +290,7 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ---
 
-## 10. Step 5 — Gold answers (Sat 24 – Sun 25 Oct 12:00; reviews by Mon 26 Oct 09:00)
+## 10. Step 5 — Gold answers (Sat 24 – Sun 25 Oct; reviews by Mon 26 Oct)
 
 ### Writing your gold answers (due Sun 25 Oct, 12:00)
 
@@ -341,10 +342,10 @@ This guide tells all 5 of us what to do, when, and how. You do not need to know 
 
 ## 13. Coordinator checklist (P1 only)
 
-- [ ] Create the "PaperPilot Labeling" Drive folder and subfolders; share with P2–P5 (edit access).
+- [ ] Create the "PaperPilot Labeling" Drive folder and subfolders; share with P2–P4 (edit access).
 - [ ] Fill in the names in section 3.
 - [ ] Upload `team-guide.md`, `guidelines.md`, `papers_catalog.csv` to `0-read-me/`.
-- [ ] Upload the five question sheets `questions_P1.csv` … `questions_P5.csv` (made by the `catalog` command).
+- [ ] Upload the four question sheets `questions_P1.csv` … `questions_P4.csv` (made by the `catalog` command).
 - [ ] Add dropdowns for `type` and `subfield` (Data → Data validation).
 - [ ] Mon 19 Oct: download the question sheets as CSV, run the question check, send fix requests.
 - [ ] Generate and upload the pilot sheets; collect them; run the agreement check.
