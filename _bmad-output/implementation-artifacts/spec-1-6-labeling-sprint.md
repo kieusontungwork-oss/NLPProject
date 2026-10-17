@@ -108,33 +108,35 @@ tests/evaluation/                                  # local only
 
 Fresh-context review of PR #4: edge-case hunter (H1–H20), test audit (T1–T15, 121 mutants), acceptance auditor (A1–A9, D1–D10, U1–U14). Three Sonnet subagents, run concurrently.
 
-- [ ] [Review][Patch] P1 (H3) — sorting one column in Google Sheets detaches labels from passages and passes the round-trip; compare each row's displayed content with the drafted sheet
-- [ ] [Review][Patch] P2 (H1, A8) — round 2 treats missing returned sheets as "nothing judged" and ignores earlier round-2 sheets; require complete pilot/round-1 returns and include round 2
-- [ ] [Review][Patch] P3 (H2, D5) — `gold-sheets` drafts from incomplete round-1 returns without a visible warning; require complete judgment stages
-- [ ] [Review][Patch] P4 (H4, A8) — the ±5% load guard blocks small round-2 drafts; gate round 1 only, report round-2 balance against cumulative loads
-- [ ] [Review][Patch] P5 (H5, H15, A2) — answerable questions can end with zero qrels; `validate` checks coverage; `sheets --round 1` requires a returned pilot; `pilot --questions` rejects ids already drafted in round 1
-- [ ] [Review][Patch] P6 (H6) — the dev/heldout split reshuffles when slice membership changes; keep committed splits, place only new ids
-- [ ] [Review][Patch] P7 (H7) — `validate --final` demands sheets from annotators who were drafted none; expected annotators come from the drafted folder
-- [ ] [Review][Patch] P8 (H8) — returned sheets are checked against regenerable class-3 drafts; drafting refuses to overwrite a stage that already has returned sheets (unless `--force`)
-- [ ] [Review][Patch] P9 (H9) — an adjudicator may be one of the pair's own labelers; refuse
-- [ ] [Review][Patch] P10 (H10, A3) — `--final` accepts a short or long unanswerable slice and a non-40/60 split; require exactly 100 (40/60) unless `--allow-short-slice`
-- [ ] [Review][Patch] P11 (H11) — question text edited after pooling is not detected; warn on drift
-- [ ] [Review][Patch] P12 (H12) — a trailing empty header column (typing in column K) blocks a sheet; drop blank trailing columns
-- [ ] [Review][Patch] P13 (H13) — `pilot --auto 0` / empty `--questions` crash with IndexError/TypeError; validate inputs
-- [ ] [Review][Patch] P14 (H14) — the three JSONL files are not replaced as a set; back up and restore on failure
-- [ ] [Review][Patch] P15 (H15) — error floods; cap per file (first 10 + count)
-- [ ] [Review][Patch] P16 (H16, H17) — report pooled (micro) agreement and per-pair n alongside the approved mean-pairwise gate; κ = n/a when a pair uses one constant label
-- [ ] [Review][Patch] P17 (H18, H19) — reuse `kb.metadata.bare_metadata_id`; read only P1–P5 files and warn on stray CSVs
-- [ ] [Review][Patch] P18 (H20) — merge exit code masking; hint "likely numeric coercion" for numeric-looking unmatched ids
-- [ ] [Review][Patch] P19 (A1) — `python -m paperpilot.evaluation.labeling` must run (`__main__.py`)
-- [ ] [Review][Patch] P20 (A4) — `--final` requires ≥ 250 answerable QA rows unless `--allow-short-qa`
-- [ ] [Review][Patch] P21 (A5) — `agreement-report.md` template + a merge summary with the evaluation-plan §6 table (rows, double-labeled %, agreement, κ, unique questions)
-- [ ] [Review][Patch] P22 (A6) — gold review required under `--final`; `disagree` rows listed in the merge summary for the coordinator
-- [ ] [Review][Patch] P23 (A7, D3, D4, D6, D7, D10) — guides: unanswerable construction rules + 10 numbered worked examples in `guidelines.md`; stale names and `<S>` notes; `(fill)`/`comment` wording; `source_paper` format; columns for Steps 4–5; year rule and "Other CS" stated up front; catalog filtering
-- [ ] [Review][Patch] P24 (D1, D2, D8, D10) — coordinator doc: one consistent rule for the few allowed manual edits in `raw/`, catalog output line, dropdown entry for the subfield containing a comma; cap multi-passage cells below the 50k-character Sheets limit
-- [ ] [Review][Patch] P25 (T1–T14) — test gaps: hash-seed-independent determinism (subprocess), golden seed pins, E1/E2/E3 union, gold subset by label 0 and 1, NO_EVIDENCE case, share rounding, tolerance boundaries, Jaccard = 0.8, year rule scope, pilot diversity, weak asserts, floor boundary, set-atomic merge, partial optional stage, `SystemExit` codes (tests stay local)
+- [x] [Review][Patch] P1 (H3) — sorting one column in Google Sheets detaches labels from passages and passes the round-trip; compare each row's displayed content with the drafted sheet
+- [x] [Review][Patch] P2 (H1, A8) — round 2 treats missing returned sheets as "nothing judged" and ignores earlier round-2 sheets; require complete pilot/round-1 returns and include round 2
+- [x] [Review][Patch] P3 (H2, D5) — `gold-sheets` drafts from incomplete round-1 returns without a visible warning; require complete judgment stages
+- [x] [Review][Patch] P4 (H4, A8) — the ±5% load guard blocks small round-2 drafts; gate round 1 only, report round-2 balance against cumulative loads
+- [x] [Review][Patch] P5 (H5, H15, A2) — answerable questions can end with zero qrels; `validate` checks coverage; `sheets --round 1` requires a returned pilot; `pilot --questions` rejects ids already drafted in round 1
+- [x] [Review][Patch] P6 (H6) — the dev/heldout split reshuffles when slice membership changes; keep committed splits, place only new ids
+- [x] [Review][Patch] P7 (H7) — `validate --final` demands sheets from annotators who were drafted none; expected annotators come from the drafted folder
+- [x] [Review][Patch] P8 (H8) — returned sheets are checked against regenerable class-3 drafts; drafting refuses to overwrite a stage that already has returned sheets (unless `--force`)
+- [x] [Review][Patch] P9 (H9) — an adjudicator may be one of the pair's own labelers; refuse
+- [x] [Review][Patch] P10 (H10, A3) — `--final` accepts a short or long unanswerable slice and a non-40/60 split; require exactly 100 (40/60) unless `--allow-short-slice`
+- [x] [Review][Patch] P11 (H11) — question text edited after pooling is not detected; warn on drift
+- [x] [Review][Patch] P12 (H12) — a trailing empty header column (typing in column K) blocks a sheet; drop blank trailing columns
+- [x] [Review][Patch] P13 (H13) — `pilot --auto 0` / empty `--questions` crash with IndexError/TypeError; validate inputs
+- [x] [Review][Patch] P14 (H14) — the three JSONL files are not replaced as a set; back up and restore on failure
+- [x] [Review][Patch] P15 (H15) — error floods; cap per file (first 10 + count)
+- [x] [Review][Patch] P16 (H16, H17) — report pooled (micro) agreement and per-pair n alongside the approved mean-pairwise gate; κ = n/a when a pair uses one constant label
+- [x] [Review][Patch] P17 (H18, H19) — reuse `kb.metadata.bare_metadata_id`; read only P1–P5 files and warn on stray CSVs
+- [x] [Review][Patch] P18 (H20) — merge exit code masking; hint "likely numeric coercion" for numeric-looking unmatched ids
+- [x] [Review][Patch] P19 (A1) — `python -m paperpilot.evaluation.labeling` must run (`__main__.py`)
+- [x] [Review][Patch] P20 (A4) — `--final` requires ≥ 250 answerable QA rows unless `--allow-short-qa`
+- [x] [Review][Patch] P21 (A5) — `agreement-report.md` template + a merge summary with the evaluation-plan §6 table (rows, double-labeled %, agreement, κ, unique questions)
+- [x] [Review][Patch] P22 (A6) — gold review required under `--final`; `disagree` rows listed in the merge summary for the coordinator
+- [x] [Review][Patch] P23 (A7, D3, D4, D6, D7, D10) — guides: unanswerable construction rules + 10 numbered worked examples in `guidelines.md`; stale names and `<S>` notes; `(fill)`/`comment` wording; `source_paper` format; columns for Steps 4–5; year rule and "Other CS" stated up front; catalog filtering
+- [x] [Review][Patch] P24 (D1, D2, D8, D10) — coordinator doc: one consistent rule for the few allowed manual edits in `raw/`, catalog output line, dropdown entry for the subfield containing a comma; cap multi-passage cells below the 50k-character Sheets limit
+- [x] [Review][Patch] P25 (T1–T14) — test gaps: hash-seed-independent determinism (subprocess), golden seed pins, E1/E2/E3 union, gold subset by label 0 and 1, NO_EVIDENCE case, share rounding, tolerance boundaries, Jaccard = 0.8, year rule scope, pilot diversity, weak asserts, floor boundary, set-atomic merge, partial optional stage, `SystemExit` codes (tests stay local)
 - [x] [Review][Defer] H20 (part) — escaping formula-like passage text; mitigated by the documented "untick convert" import step. Target: only if a returned sheet shows it
 - [x] [Review][Defer] Replacement path for `NO_EVIDENCE` answerable questions (A4 part): the coordinator decides at merge time via `--allow-short-qa`. Target: Mon 26 Oct merge, if needed
+
+- [x] [Review][Defer] P1 limit — sorting only the `relevance` column cannot be detected by comparing content (relevance is the filled cell); the guide's golden rule ("never sort or filter a single column") is the protection. Target: a monotonic-column heuristic warning, only if a returned sheet shows it
 
 Dismissed: `Findings` being a mutable dataclass (A9; it is an accumulator, not a value); test hygiene nits T15 (no behavior at stake).
 
@@ -143,6 +145,7 @@ Dismissed: `Findings` being a mutable dataclass (A9; it is an accumulator, not a
 - 2026-10-17: Initial frozen block (in-session). Deviations from `evaluation-plan.md`, all for the owner's review: (1) round-1 pool = top-**10** union of E1/E2/E3 (~19/question, ~4,750 judgments) instead of top-20 (~36/question, ~9,000) — keeps judged@10 = 100% for the baselines at half the effort; (2) question rows live in `queries.jsonl`, not inside `qrels.jsonl`; (3) the IAA gate is defined as mean pairwise raw agreement on 0/1/2, κ reported; (4) 5 annotators, so agreement is pairwise. `story6-labeling-pack-prompt.md` is superseded (it predates the 100-question slice and the 2017 corpus end).
 - 2026-10-17: Spec checkpoint passed — owner approved the frozen block, including deviations (1)–(4). KEEP: top-10 union pool; 15% whole-question double-labeling; gate = mean pairwise raw agreement ≥ 80%; teammates never run code.
 - 2026-10-17: Build amendments (tooling). (a) Label resolution for multi-labeled pairs: adjudication row if present, else unanimous, else strict majority, else an adjudication row is required (E-4); pilot rows (5 labels) usually resolve by majority. (b) Round-1 assignment processes questions round-robin across authors (`P1-001, P2-001, …`) instead of sorted query_id order: in sorted order the last author's questions starve one annotator (−16.5% load on a 245-question synthetic run, failing the ±5% guard); round-robin gives ±2%. (c) Display text in sheets strips the header prefix and `<S>`/`</S>` markers (display only). (d) Unanswerable adjudication rows use `chunk_id = UNANSWERABLE` with `final_relevance` yes/no; replacement questions take ids `P<n>-U21…` and are re-checked with `unanswerable-sheets --only`. (e) A second pilot archives the first pilot's folders and its questions return to round 1. (f) `agreement` exits 0 on a FAIL verdict (the verdict is printed); exit 1 is for malformed sheets. (g) The labeling timeline was compressed to one week (17–24 Oct) at the owner's request; round 2 waits for story 1.5. KEEP: round-robin assignment; teammates never run code; the resolution rule is identical in merge, gold-sheets and validate.
+- 2026-10-17: Post-review amendment — P1–P25 applied (623 tests). Notable decisions: (1) gold-review is required at merge; `disagree` rows are listed, not blocking; (2) a failed first pilot is archived and its labels are not used (two pilots cannot share one stage without "already judged" conflicts); its questions go into round 1; (3) the adjudicator rule ("not one of the pair's labelers") is waived for pilot pairs, which all five people label; (4) Cohen's κ is `None` ("n/a") when a pair uses one constant label, excluded from the mean; the gate stays mean pairwise raw agreement ≥ 0.80, with the pooled value reported beside it; (5) because gold sheets need every drafted judgment stage returned, the coordinator drafts gold sheets before drafting round 2, and review sheets after round 2 is back; (6) `--final` requires exactly 100 unanswerable (40/60) and ≥ 250 answerable QA rows unless `--allow-short-slice` / `--allow-short-qa`; committed splits never move. `agreement-report.md` template added, filled from `merge_summary.json`. KEEP: drafting refuses to overwrite a stage with returned sheets (unless `--force`); round-trip compares row content; merge replaces the three files as a set.
 
 ## Design Notes
 

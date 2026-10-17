@@ -9,7 +9,7 @@ row and rank never reach a sheet (they stay hidden from annotators).
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import zip_longest
 from pathlib import Path
@@ -19,9 +19,11 @@ from paperpilot.core.errors import LabelingStageError
 from paperpilot.core.schemas import Hit
 from paperpilot.evaluation.labeling import (
     ANNOTATORS,
+    CELL_CAP_CHARS,
     LOAD_TOLERANCE,
     N_UNANSWERABLE,
     NO_EVIDENCE,
+    PASSAGE_CAP_CHARS,
     POOL_DEPTH,
     seeded,
     share_count,
@@ -29,12 +31,19 @@ from paperpilot.evaluation.labeling import (
 from paperpilot.evaluation.labeling.merge import Resolution
 from paperpilot.evaluation.labeling.sheets import (
     JUDGMENT_COLUMNS,
+    REPLACEMENTS,
+    UNANSWERABLE_COLUMNS,
+    Findings,
     GoldRow,
     Judgment,
     Question,
+    drafted_annotators,
+    drafted_dir,
     parse_query_id,
     raw_dir,
+    raw_path,
     read_checked,
+    stage_files,
     strip_sentence_tags,
 )
 from paperpilot.retrieval.retriever import Retriever
@@ -59,7 +68,12 @@ class Passage:
 class Assignment:
     primary: dict[str, str]
     second: dict[str, str]
-    loads: dict[str, int]
+    loads: dict[str, int]  # rows added by this assignment
+    base: dict[str, int] | None = None  # rows already assigned in earlier rounds (round 2 balances cumulatively)
+
+    @property
+    def cumulative(self) -> dict[str, int]:
+        return {a: n + (self.base or {}).get(a, 0) for a, n in self.loads.items()}
 
     def questions_of(self, annotator: str) -> list[str]:
         ids = [q for q, a in self.primary.items() if a == annotator] + [q for q, a in self.second.items() if a == annotator]
@@ -111,9 +125,22 @@ def build_ranked(
     return {q.query_id: tuple(passage_from_hit(h) for h in retriever.retrieve(q.text, k).hits) for q in questions}
 
 
+def cap_text(text: str, limit: int) -> str:
+    """`text` cut to at most `limit` characters, ending in " …" when it was cut (display only)."""
+    return text if len(text) <= limit else text[: limit - 2] + " …"
+
+
 def format_passages(passages: Sequence[Passage], labels: Sequence[str]) -> str:
-    """`[label] <title> — <section> (<year>): <text>` blocks separated by blank lines."""
-    return "\n\n".join(f"[{label}] {p.paper_title} — {p.section} ({p.year}): {p.text}" for label, p in zip(labels, passages))
+    """`[label] <title> — <section> (<year>): <text>` blocks separated by blank lines.
+
+    Display only: each passage's text is capped at 2,000 characters and the whole cell at 45,000, to stay under
+    Google Sheets' 50,000-character cell limit; the round-trip compares against the drafted (capped) text.
+    """
+    blocks = (
+        f"[{label}] {p.paper_title} — {p.section} ({p.year}): {cap_text(p.text, PASSAGE_CAP_CHARS)}"
+        for label, p in zip(labels, passages)
+    )
+    return cap_text("\n\n".join(blocks), CELL_CAP_CHARS)
 
 
 # --- assignment ------------------------------------------------------------------------------
@@ -131,11 +158,18 @@ def interleaved_order(ids: Sequence[str], authors: Mapping[str, str]) -> list[st
     return [qid for group in zip_longest(*(by_author[a] for a in sorted(by_author))) for qid in group if qid is not None]
 
 
-def assign(weights: Mapping[str, int], authors: Mapping[str, str], purpose: str) -> Assignment:
-    """Least-loaded assignment (ties -> lowest id); nobody judges their own question; 15% double-labeled."""
+def assign(
+    weights: Mapping[str, int], authors: Mapping[str, str], purpose: str, base_loads: Mapping[str, int] | None = None
+) -> Assignment:
+    """Least-loaded assignment (ties -> lowest id); nobody judges their own question; 15% double-labeled.
+
+    `base_loads` (rows already assigned in earlier rounds) start the load counters, so round 2 balances the
+    cumulative load; `Assignment.loads` still reports only the rows this call added.
+    """
     ids = sorted(weights)
     doubled = set(seeded("double", purpose).sample(ids, share_count(len(ids)))) if ids else set()
-    loads = dict.fromkeys(ANNOTATORS, 0)
+    base = {a: (base_loads or {}).get(a, 0) for a in ANNOTATORS}
+    loads = dict(base)
     primary: dict[str, str] = {}
     second: dict[str, str] = {}
     for qid in interleaved_order(ids, authors):
@@ -147,7 +181,7 @@ def assign(weights: Mapping[str, int], authors: Mapping[str, str], purpose: str)
             other = min((a for a in eligible if a != chosen), key=lambda a: (loads[a], a))
             second[qid] = other
             loads[other] += weights[qid]
-    return Assignment(primary, second, loads)
+    return Assignment(primary, second, {a: loads[a] - base[a] for a in ANNOTATORS}, base if base_loads else None)
 
 
 def balance_offenders(loads: Mapping[str, int], tolerance: float = LOAD_TOLERANCE) -> list[str]:
@@ -195,11 +229,14 @@ def draft_pilot(
     return {annotator: [dict(row) for row in rows] for annotator in ANNOTATORS}
 
 
-def pick_pilot_questions(questions: Sequence[Question], n: int) -> list[str]:
-    """`--auto n`: n answerable questions, each from a different author, covering different subfields (seeded)."""
+def pick_pilot_questions(questions: Sequence[Question], n: int, exclude: Collection[str] = ()) -> list[str]:
+    """`--auto n` (1 <= n <= 5): n answerable questions, each from a different author, covering different
+    subfields (seeded); ids in `exclude` (already drafted for round 1) are never picked."""
+    if not 1 <= n <= len(ANNOTATORS):
+        raise LabelingStageError("pilot", f"--auto needs 1 <= N <= {len(ANNOTATORS)}, got {n}")
     by_author: dict[str, list[Question]] = {}
     for q in sorted(questions, key=lambda q: q.query_id):
-        if q.answerable:
+        if q.answerable and q.query_id not in exclude:
             by_author.setdefault(q.author, []).append(q)
     if len(by_author) < n:
         raise LabelingStageError("pilot", f"--auto {n} needs answerable questions from {n} different authors; found {len(by_author)}")
@@ -217,39 +254,89 @@ def pick_pilot_questions(questions: Sequence[Question], n: int) -> list[str]:
     return sorted(chosen)
 
 
-def judged_pairs(eval_dir: str | Path, stages: Sequence[str] = ("pilot", "round1")) -> set[PairKey]:
-    """(query_id, chunk_id) pairs with a returned judgment row in the given stages' raw sheets (E-10)."""
+def _pairs_of(path, findings: Findings) -> list[tuple[str, str]]:
+    sheet, issues = read_checked(path, JUDGMENT_COLUMNS)
+    if sheet is None:
+        findings.errors.extend(issues)
+        return []
+    return [(row.values["query_id"], row.values["passage_id"]) for row in sheet.rows]
+
+
+def judged_pairs(eval_dir: str | Path, reports_dir: str | Path) -> tuple[set[PairKey], dict[str, int], Findings]:
+    """(query_id, chunk_id) pairs with a returned judgment row in pilot, round 1 and round 2 (E-10), the rows each
+    annotator already carries (round 1 + round 2, for cumulative balancing), and blocking findings.
+
+    A returned sheet is required for every annotator with a drafted pilot/round-1 sheet: a missing one would
+    silently look like "nothing judged". Returned round-2 sheets are included so repeated calls never re-draft.
+    Raises LabelingStageError when there are no returned pilot/round-1 sheets at all.
+    """
+    findings = Findings()
     pairs: set[PairKey] = set()
+    loads = dict.fromkeys(ANNOTATORS, 0)
     found = False
-    for stage in stages:
-        for path in sorted(raw_dir(eval_dir, stage).glob("P*.csv")):
-            sheet, issues = read_checked(path, JUDGMENT_COLUMNS)
-            if sheet is None:
-                raise LabelingStageError("pooling", "; ".join(str(i) for i in issues) + "; fix the returned sheet (see `validate`)")
-            found = True
-            pairs.update((row.values["query_id"], row.values["passage_id"]) for row in sheet.rows)
+    for stage in ("pilot", "round1", "round2"):
+        returned, strays = stage_files(raw_dir(eval_dir, stage))
+        findings.warnings.extend(strays)
+        if stage != "round2":
+            for annotator in drafted_annotators(reports_dir, stage):
+                if annotator not in returned:
+                    findings.error(raw_path(eval_dir, stage, annotator), "returned sheet missing: needed to know which passages are judged")
+            found = found or bool(returned)
+        for annotator, path in returned.items():
+            rows = _pairs_of(path, findings)
+            pairs.update(rows)
+            if stage != "pilot":
+                loads[annotator] += len(rows)
     if not found:
-        raise LabelingStageError("pooling", f"no returned {'/'.join(stages)} sheets under {Path(eval_dir) / 'labeling' / 'raw'}; save them first")
-    return pairs
+        raise LabelingStageError("pooling", f"no returned pilot/round1 sheets under {Path(eval_dir) / 'labeling' / 'raw'}; save them first")
+    return pairs, loads, findings
+
+
+def pilot_ready(eval_dir: str | Path, reports_dir: str | Path) -> Findings:
+    """Round 1 may only be drafted once the pilot is drafted and every returned pilot sheet is in."""
+    findings = Findings()
+    drafted = drafted_annotators(reports_dir, "pilot")
+    if not drafted:
+        findings.error(drafted_dir(reports_dir, "pilot"), "no pilot has been drafted: run `pilot` and pass the gate before round 1")
+    returned, _ = stage_files(raw_dir(eval_dir, "pilot"))
+    for annotator in drafted:
+        if annotator not in returned:
+            findings.error(raw_path(eval_dir, "pilot", annotator), "returned pilot sheet missing: round 1 is drafted only after the pilot is back and passed")
+    return findings
 
 
 def pilot_query_ids(eval_dir: str | Path, reports_dir: str | Path) -> set[str]:
     """Questions used in the pilot: query ids in the pilot drafts and returned pilot sheets (excluded from round 1)."""
     ids: set[str] = set()
-    for directory in (Path(reports_dir) / "pooling" / "pilot", raw_dir(eval_dir, "pilot")):
-        for path in sorted(directory.glob("P*.csv")):
+    for directory in (drafted_dir(reports_dir, "pilot"), raw_dir(eval_dir, "pilot")):
+        for path in stage_files(directory)[0].values():
             sheet, _ = read_checked(path, JUDGMENT_COLUMNS)
             if sheet is not None:
                 ids.update(row.values["query_id"] for row in sheet.rows)
     return ids
 
 
+def round1_query_ids(reports_dir: str | Path) -> set[str]:
+    """Question ids already drafted into round-1 sheets (they can no longer become pilot questions)."""
+    ids: set[str] = set()
+    for path in stage_files(drafted_dir(reports_dir, "round1"))[0].values():
+        sheet, _ = read_checked(path, JUDGMENT_COLUMNS)
+        if sheet is not None:
+            ids.update(row.values["query_id"] for row in sheet.rows)
+    return ids
+
+
 def draft_round(
-    candidates: Sequence[Question], pools: Mapping[str, Sequence[Passage]], purpose: str
+    candidates: Sequence[Question],
+    pools: Mapping[str, Sequence[Passage]],
+    purpose: str,
+    base_loads: Mapping[str, int] | None = None,
 ) -> tuple[dict[str, list[dict[str, str]]], Assignment]:
     """Assign `candidates` (with non-empty pools) and draft one sheet per annotator (I-4)."""
     questions = {q.query_id: q for q in candidates if pools.get(q.query_id)}
-    assignment = assign({qid: len(pools[qid]) for qid in questions}, {qid: q.author for qid, q in questions.items()}, purpose)
+    assignment = assign(
+        {qid: len(pools[qid]) for qid in questions}, {qid: q.author for qid, q in questions.items()}, purpose, base_loads
+    )
     sheets = {a: draft_judgment_sheet(assignment.questions_of(a), questions, pools) for a in ANNOTATORS}
     return sheets, assignment
 
@@ -257,12 +344,26 @@ def draft_round(
 # --- unanswerable check sheets (I-6) -----------------------------------------------------------------
 
 
-def draft_unanswerable(
-    unanswerable: Sequence[Question], pools: Mapping[str, Sequence[Passage]], only: Sequence[str] | None = None
-) -> dict[str, list[dict[str, str]]]:
-    """Per annotator: their own unanswerable questions + 15% of others' original ones (seeded), top-10 E3 passages.
+def previous_replacement_ids(reports_dir: str | Path) -> dict[str, list[str]]:
+    """Question ids already drafted into each author's `replacements` sheet."""
+    out: dict[str, list[str]] = {}
+    for annotator, path in stage_files(drafted_dir(reports_dir, "unanswerable", REPLACEMENTS))[0].items():
+        sheet, _ = read_checked(path, UNANSWERABLE_COLUMNS)
+        if sheet is not None:
+            out[annotator] = [row.values["query_id"] for row in sheet.rows]
+    return out
 
-    With `only`, just those question ids, for their authors (replacement questions; no double-check rows).
+
+def draft_unanswerable(
+    unanswerable: Sequence[Question],
+    pools: Mapping[str, Sequence[Passage]],
+    only: Sequence[str] | None = None,
+    previous: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, list[dict[str, str]]]:
+    """Per annotator: their own original unanswerable questions + 15% of others' (seeded), top-10 E3 passages.
+
+    Replacement questions (`P<n>-U21+`) are never in the full sheet. With `only`, each author's sheet holds
+    those ids plus the replacement ids already drafted for them (`previous`), and no double-check rows.
     """
     by_id = {q.query_id: q for q in unanswerable}
     originals = [q for q in sorted(unanswerable, key=lambda q: q.query_id) if parse_query_id(q.query_id)[2] <= N_UNANSWERABLE]  # type: ignore[index]
@@ -277,12 +378,13 @@ def draft_unanswerable(
 
     sheets: dict[str, list[dict[str, str]]] = {}
     for annotator in ANNOTATORS:
-        own = [q for q in by_id.values() if q.author == annotator and (only is None or q.query_id in only)]
-        chosen = list(own)
         if only is None:
+            chosen = [q for q in originals if q.author == annotator]
             others = [q for q in originals if q.author != annotator]
-            n_own = len([q for q in originals if q.author == annotator])
-            chosen += seeded("unanswerable-double", annotator).sample(others, min(len(others), share_count(n_own)))
+            chosen += seeded("unanswerable-double", annotator).sample(others, min(len(others), share_count(len(chosen))))
+        else:
+            wanted = set(only) | set((previous or {}).get(annotator, ()))
+            chosen = [q for q in by_id.values() if q.author == annotator and q.query_id in wanted]
         sheets[annotator] = [row(q) for q in sorted(chosen, key=lambda q: q.query_id)]
     return sheets
 

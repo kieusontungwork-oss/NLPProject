@@ -18,8 +18,8 @@ COORDINATOR = "P1"
 
 STAGES: tuple[str, ...] = ("questions", "pilot", "round1", "round2", "unanswerable", "gold", "gold-review")
 JUDGMENT_STAGES: tuple[str, ...] = ("pilot", "round1", "round2")
-# Stages `merge`/`validate --final` cannot run without; round2 and gold-review are optional.
-REQUIRED_STAGES: tuple[str, ...] = ("questions", "pilot", "round1", "unanswerable", "gold")
+# Stages `merge`/`validate --final` cannot run without; round2 is optional (but must be complete if it exists).
+REQUIRED_STAGES: tuple[str, ...] = ("questions", "pilot", "round1", "unanswerable", "gold", "gold-review")
 
 N_ANSWERABLE = 50
 N_UNANSWERABLE = 20
@@ -34,6 +34,10 @@ LABEL_FLOOR = 1250
 UNANSWERABLE_CHUNK_ID = "UNANSWERABLE"
 NO_EVIDENCE = "NO_EVIDENCE"
 SLICE_SIZE = 100
+ANSWERABLE_QA_FLOOR = 250
+SMALL_PAIR_ROWS = 10
+PASSAGE_CAP_CHARS = 2000  # display cap per passage on unanswerable/gold/review sheets
+CELL_CAP_CHARS = 45000  # display cap per multi-passage cell (Google Sheets allows 50,000 characters per cell)
 
 
 def seeded(purpose: str, key: str) -> random.Random:
@@ -42,5 +46,6 @@ def seeded(purpose: str, key: str) -> random.Random:
 
 
 def share_count(n: int) -> int:
-    """Items in the 15% double-check share of `n` (`round(0.15 * n)`)."""
+    """Items in the 15% double-check share of `n`: Python `round(0.15 * n)` (banker's rounding on exact .5, e.g.
+    round(7.5) = 8 and round(2.5) = 2). Deliberate and pinned by tests; do not replace with floor/ceil."""
     return round(DOUBLE_SHARE * n)

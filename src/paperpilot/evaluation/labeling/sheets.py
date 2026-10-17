@@ -19,6 +19,7 @@ from pathlib import Path
 
 from paperpilot.core.errors import LabelingStageError
 from paperpilot.core.ids import normalize
+from paperpilot.kb.metadata import bare_metadata_id
 from paperpilot.evaluation.labeling import (
     ANNOTATORS,
     N_ANSWERABLE,
@@ -86,13 +87,24 @@ STAGE_KEYS: dict[str, tuple[str, ...]] = {
     "gold-review": ("query_id",),
 }
 
+# Columns a returned row must keep unchanged (compared after whitespace normalization with the drafted row).
+STAGE_FIXED: dict[str, tuple[str, ...]] = {
+    "questions": (),
+    "pilot": ("question", "paper_title", "section", "year", "passage"),
+    "round1": ("question", "paper_title", "section", "year", "passage"),
+    "round2": ("question", "paper_title", "section", "year", "passage"),
+    "unanswerable": ("question", "passages"),
+    "gold": ("question", "passages"),
+    "gold-review": ("question", "passages", "gold_answer"),
+}
+
 ALLOWED_RELEVANCE = ("0", "1", "2")
 ALLOWED_YES_NO = ("yes", "no")
 ALLOWED_REVIEW = ("agree", "disagree")
 
 _QUERY_ID = re.compile(r"^(P[1-9])-(?:(\d{3})|U(\d{2,}))$")
 _BAD_YEAR = re.compile(r"\b20(?:1[89]|2\d)\b")
-_VERSION_SUFFIX = re.compile(r"v\d+$", re.IGNORECASE)
+_NUMERIC_LOOKING = re.compile(r"^[0-9.eE+-]+$")
 
 
 # --- findings -------------------------------------------------------------------------------
@@ -133,20 +145,44 @@ class Findings:
 # --- paths ----------------------------------------------------------------------------------
 
 
-def raw_dir(eval_dir: str | Path, stage: str) -> Path:
-    return Path(eval_dir) / "labeling" / "raw" / stage
+REPLACEMENTS = "replacements"  # sub-folder of `unanswerable` holding replacement-question check sheets
 
 
-def raw_path(eval_dir: str | Path, stage: str, annotator: str) -> Path:
-    return raw_dir(eval_dir, stage) / f"{annotator}.csv"
+def raw_dir(eval_dir: str | Path, stage: str, subdir: str = "") -> Path:
+    return Path(eval_dir) / "labeling" / "raw" / stage / subdir
 
 
-def drafted_dir(reports_dir: str | Path, stage: str) -> Path:
-    return Path(reports_dir) / "pooling" / stage
+def raw_path(eval_dir: str | Path, stage: str, annotator: str, subdir: str = "") -> Path:
+    return raw_dir(eval_dir, stage, subdir) / f"{annotator}.csv"
 
 
-def drafted_path(reports_dir: str | Path, stage: str, annotator: str) -> Path:
-    return drafted_dir(reports_dir, stage) / f"{annotator}.csv"
+def drafted_dir(reports_dir: str | Path, stage: str, subdir: str = "") -> Path:
+    return Path(reports_dir) / "pooling" / stage / subdir
+
+
+def drafted_path(reports_dir: str | Path, stage: str, annotator: str, subdir: str = "") -> Path:
+    return drafted_dir(reports_dir, stage, subdir) / f"{annotator}.csv"
+
+
+def stage_files(directory: Path) -> tuple[dict[str, Path], list[str]]:
+    """The one file-discovery helper: `P1.csv`..`P5.csv` in `directory`; any other `*.csv` is warned about and ignored."""
+    files: dict[str, Path] = {}
+    strays: list[str] = []
+    if directory.is_dir():
+        for path in sorted(directory.glob("*.csv")):
+            if path.stem in ANNOTATORS and path.name == f"{path.stem}.csv":
+                files[path.stem] = path
+            else:
+                strays.append(f"ignored {path}: stage folders only read {ANNOTATORS[0]}.csv .. {ANNOTATORS[-1]}.csv")
+    return files, strays
+
+
+def returned_annotators(eval_dir: str | Path, stage: str, subdir: str = "") -> tuple[str, ...]:
+    return tuple(stage_files(raw_dir(eval_dir, stage, subdir))[0])
+
+
+def drafted_annotators(reports_dir: str | Path, stage: str, subdir: str = "") -> tuple[str, ...]:
+    return tuple(stage_files(drafted_dir(reports_dir, stage, subdir))[0])
 
 
 def adjudication_path(eval_dir: str | Path) -> Path:
@@ -167,7 +203,6 @@ class Sheet:
     path: Path
     header: tuple[str, ...]
     rows: tuple[SheetRow, ...]
-    overflow_rows: tuple[int, ...] = ()  # rows with non-blank cells beyond the last header column
 
     def where(self, row: SheetRow) -> str:
         return f"{self.path}:{row.number}"
@@ -204,17 +239,17 @@ def read_sheet(path: str | Path) -> Sheet:
         raise LabelingStageError("sheets", f"cannot read {path} as UTF-8 CSV: {exc}") from exc
     if not table:
         raise LabelingStageError("sheets", f"{path} is empty (no header row)")
-    header = tuple(cell.strip() for cell in table[0])
+    # Drop trailing columns whose header and every cell are blank (spreadsheet exports add them).
+    last = max((k for line in table for k, cell in enumerate(line) if cell.strip()), default=-1)
+    width = max(last + 1, 0)
+    header = tuple(cell.strip() for cell in table[0][:width])
     rows: list[SheetRow] = []
-    overflow: list[int] = []
     for number, cells in enumerate(table[1:], start=2):
         if not any(cell.strip() for cell in cells):
             continue
-        padded = [cell.strip() for cell in cells] + [""] * max(0, len(header) - len(cells))
+        padded = [cell.strip() for cell in cells[:width]] + [""] * max(0, width - len(cells))
         rows.append(SheetRow(number, dict(zip(header, padded))))
-        if any(cell.strip() for cell in cells[len(header) :]):
-            overflow.append(number)
-    return Sheet(path, header, tuple(rows), tuple(overflow))
+    return Sheet(path, header, tuple(rows))
 
 
 def read_checked(path: Path, expected: tuple[str, ...]) -> tuple[Sheet | None, list[Issue]]:
@@ -226,7 +261,7 @@ def read_checked(path: Path, expected: tuple[str, ...]) -> tuple[Sheet | None, l
     issues = check_columns(sheet, expected)
     if issues:
         return None, issues
-    return sheet, [Issue(f"{path}:{number}", "row has cells beyond the last column") for number in sheet.overflow_rows]
+    return sheet, []
 
 
 def check_columns(sheet: Sheet, expected: tuple[str, ...]) -> list[Issue]:
@@ -249,10 +284,23 @@ def _preview(items: list[str], limit: int = 10) -> str:
     return shown + (f", ... and {len(items) - limit} more" if len(items) > limit else "")
 
 
-def check_roundtrip(returned: Sheet, drafted: Sheet, key_columns: tuple[str, ...]) -> list[Issue]:
-    """E-3: the returned row set must equal the drafted one (rows deleted, added, or `passage_id` edited)."""
+def _numeric_hint(row: SheetRow, key_columns: tuple[str, ...]) -> str:
+    for column in ("passage_id", "query_id"):
+        if column in key_columns and _NUMERIC_LOOKING.match(row.values.get(column, "")):
+            return (
+                f" (the {column} looks like a number: Google Sheets probably converted this id to a number "
+                "— re-import with 'Convert text to numbers' unticked)"
+            )
+    return ""
+
+
+def check_roundtrip(
+    returned: Sheet, drafted: Sheet, key_columns: tuple[str, ...], fixed_columns: tuple[str, ...] = ()
+) -> list[Issue]:
+    """E-3: the returned row set must equal the drafted one (rows deleted, added, `passage_id` edited), and each
+    row's fixed (non-fill) columns must be unchanged after whitespace normalization (a sorted single column)."""
     issues: list[Issue] = []
-    drafted_keys = {_key(row, key_columns) for row in drafted.rows}
+    drafted_by_key = {_key(row, key_columns): row for row in drafted.rows}
     seen: dict[tuple[str, ...], int] = {}
     for row in returned.rows:
         key = _key(row, key_columns)
@@ -260,8 +308,17 @@ def check_roundtrip(returned: Sheet, drafted: Sheet, key_columns: tuple[str, ...
             issues.append(Issue(returned.where(row), f"duplicate row {list(key)} (first at row {seen[key]})"))
             continue
         seen[key] = row.number
-        if key not in drafted_keys:
-            issues.append(Issue(returned.where(row), f"row {list(key)} is not in the drafted sheet (added or id edited)"))
+        original = drafted_by_key.get(key)
+        if original is None:
+            issues.append(
+                Issue(returned.where(row), f"row {list(key)} is not in the drafted sheet (added or id edited){_numeric_hint(row, key_columns)}")
+            )
+            continue
+        changed = [c for c in fixed_columns if normalize(row.values.get(c, "")) != normalize(original.values.get(c, ""))]
+        if changed:
+            issues.append(
+                Issue(returned.where(row), f"the row content changed ({', '.join(changed)} differs from the drafted sheet) — was a single column sorted?")
+            )
     missing = [str(list(_key(row, key_columns))) for row in drafted.rows if _key(row, key_columns) not in seen]
     if missing:
         issues.append(Issue(str(returned.path), f"{len(missing)} drafted row(s) missing: {_preview(missing)}"))
@@ -282,24 +339,27 @@ def load_stage_sheets(
     stage: str,
     *,
     require_all: bool = False,
+    subdir: str = "",
 ) -> tuple[dict[str, Sheet], Findings]:
-    """Read every returned sheet of `stage`, checking columns (E-2) and rows against the drafted sheet (E-3).
+    """Read every returned sheet of `stage`, checking columns (E-2) and rows + fixed content against the drafted sheet (E-3).
 
-    `questions` is compared against the generated template instead (via `expected_ids`). A missing returned
-    sheet is an error with `require_all`, else a warning (info only when the stage has no returned sheets at all).
+    Expected annotators are those with a drafted sheet (all of P1-P5 for `questions`). A missing returned sheet is
+    an error with `require_all`, else a warning (info only when the stage has no returned sheets at all).
+    `subdir` selects a sub-folder of the stage (the unanswerable `replacements`).
     """
     if stage not in STAGES:
         raise LabelingStageError("sheets", f"unknown stage {stage!r}; stages: {list(STAGES)}")
     findings = Findings()
     sheets: dict[str, Sheet] = {}
-    missing: list[str] = []
-    expected = STAGE_COLUMNS[stage]
-    for annotator in ANNOTATORS:
-        path = raw_path(eval_dir, stage, annotator)
-        if not path.is_file():
-            missing.append(annotator)
-            continue
-        sheet, issues = read_checked(path, expected)
+    expected_columns = STAGE_COLUMNS[stage]
+    returned, strays = stage_files(raw_dir(eval_dir, stage, subdir))
+    findings.warnings.extend(strays)
+    if stage == "questions" or reports_dir is None:
+        expected = ANNOTATORS
+    else:
+        expected = drafted_annotators(reports_dir, stage, subdir)
+    for annotator, path in returned.items():
+        sheet, issues = read_checked(path, expected_columns)
         findings.errors.extend(issues)
         if sheet is None:
             continue
@@ -307,26 +367,27 @@ def load_stage_sheets(
         if stage == "questions":
             findings.errors.extend(check_question_ids(sheet, annotator))
             continue
-        drafted = drafted_path(reports_dir, stage, annotator) if reports_dir is not None else None
+        drafted = drafted_path(reports_dir, stage, annotator, subdir) if reports_dir is not None else None
         if drafted is None or not drafted.is_file():
             findings.error(
                 path,
-                f"no drafted sheet at {drafted} to compare against; regenerate it (drafting is deterministic) "
-                f"and re-run",
+                f"no drafted sheet at {drafted} to compare against; regenerate it (drafting is deterministic) and re-run",
             )
             continue
-        drafted_sheet, drafted_issues = read_checked(drafted, expected)
+        drafted_sheet, drafted_issues = read_checked(drafted, expected_columns)
         if drafted_sheet is None:
             findings.errors.extend(drafted_issues)
             continue
-        findings.errors.extend(check_roundtrip(sheet, drafted_sheet, STAGE_KEYS[stage]))
-    if len(missing) == len(ANNOTATORS):
-        findings.info.append(f"stage {stage!r}: no returned sheets in {raw_dir(eval_dir, stage)} (skipped)")
+        findings.errors.extend(check_roundtrip(sheet, drafted_sheet, STAGE_KEYS[stage], STAGE_FIXED[stage]))
+    missing = [a for a in expected if a not in returned]
+    where = raw_dir(eval_dir, stage, subdir)
+    if not returned:
+        findings.info.append(f"stage {stage!r}: no returned sheets in {where} (skipped)")
         if require_all:
-            findings.error(raw_dir(eval_dir, stage), f"no returned sheets for required stage {stage!r}")
+            findings.error(where, f"no returned sheets for required stage {stage!r}")
     else:
         for annotator in missing:
-            path = raw_path(eval_dir, stage, annotator)
+            path = raw_path(eval_dir, stage, annotator, subdir)
             if require_all:
                 findings.error(path, "returned sheet missing")
             else:
@@ -401,11 +462,11 @@ def read_paper_ids(kb_dir: str | Path) -> set[str]:
 
 
 def normalize_arxiv_id(value: str) -> str:
-    """Trim, drop a leading `arXiv:` and a trailing version (`v2`) from a typed arXiv id."""
+    """Trim, drop a leading `arXiv:` (local) and a trailing version (`kb.metadata.bare_metadata_id`) from a typed id."""
     value = value.strip()
     if value.lower().startswith("arxiv:"):
         value = value[len("arxiv:") :]
-    return _VERSION_SUFFIX.sub("", value.strip())
+    return bare_metadata_id(value.strip())
 
 
 def load_questions(eval_dir: str | Path) -> list[Question]:
@@ -579,6 +640,7 @@ class Judgment:
     year: str
     passage: str
     where: str
+    question: str = ""  # the question text shown on the returned sheet (drift check)
 
 
 @dataclass(frozen=True)
@@ -642,6 +704,7 @@ def load_judgments(
                     year=values["year"],
                     passage=values["passage"],
                     where=sheet.where(row),
+                    question=values["question"],
                 )
             )
     return judgments, findings
@@ -650,16 +713,24 @@ def load_judgments(
 def load_answer_checks(
     eval_dir: str | Path, reports_dir: str | Path, *, require_all: bool = False
 ) -> tuple[list[AnswerCheck], Findings]:
-    sheets, findings = load_stage_sheets(eval_dir, reports_dir, "unanswerable", require_all=require_all)
+    """Answers from the main unanswerable sheets plus the `replacements/` sheets (never required)."""
+    findings = Findings()
     checks: list[AnswerCheck] = []
-    for annotator, sheet in sheets.items():
-        for row in sheet.rows:
-            values = row.values
-            answer = values["answered_by_library"].lower()
-            if answer not in ALLOWED_YES_NO:
-                findings.error(sheet.where(row), f"answered_by_library {values['answered_by_library']!r} is not yes/no (query {values['query_id']})")
-                continue
-            checks.append(AnswerCheck(annotator, values["query_id"], answer, values["new_question"], sheet.where(row)))
+    for subdir, needed in (("", require_all), (REPLACEMENTS, False)):
+        sheets, sheet_findings = load_stage_sheets(eval_dir, reports_dir, "unanswerable", require_all=needed, subdir=subdir)
+        if subdir and not sheets:
+            sheet_findings.info.clear()  # replacements are optional: no noise when there are none
+            for annotator in drafted_annotators(reports_dir, "unanswerable", subdir):
+                sheet_findings.warnings.append(f"returned sheet missing: {raw_path(eval_dir, 'unanswerable', annotator, subdir)}")
+        findings.extend(sheet_findings)
+        for annotator, sheet in sheets.items():
+            for row in sheet.rows:
+                values = row.values
+                answer = values["answered_by_library"].lower()
+                if answer not in ALLOWED_YES_NO:
+                    findings.error(sheet.where(row), f"answered_by_library {values['answered_by_library']!r} is not yes/no (query {values['query_id']})")
+                    continue
+                checks.append(AnswerCheck(annotator, values["query_id"], answer, values["new_question"], sheet.where(row)))
     return checks, findings
 
 

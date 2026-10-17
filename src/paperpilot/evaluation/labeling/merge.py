@@ -14,14 +14,17 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from paperpilot.core.errors import LabelingStageError
+from paperpilot.core.ids import normalize
 from paperpilot.evaluation.labeling import (
     ANNOTATORS,
+    ANSWERABLE_QA_FLOOR,
     DEV_SHARE,
     JUDGMENT_STAGES,
     LABEL_FLOOR,
@@ -32,6 +35,7 @@ from paperpilot.evaluation.labeling import (
     UNANSWERABLE_CHUNK_ID,
     seeded,
 )
+from paperpilot.evaluation.labeling.agreement import LabelMap, compute_agreement
 from paperpilot.evaluation.labeling.sheets import (
     ADJUDICATION_COLUMNS,
     AnswerCheck,
@@ -39,7 +43,9 @@ from paperpilot.evaluation.labeling.sheets import (
     Judgment,
     Question,
     adjudication_path,
+    atomic_write,
     check_questions,
+    drafted_annotators,
     load_answer_checks,
     load_gold_rows,
     load_judgments,
@@ -48,6 +54,7 @@ from paperpilot.evaluation.labeling.sheets import (
     parse_query_id,
     raw_dir,
     read_checked,
+    returned_annotators,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,6 +107,8 @@ class Outputs:
     qa_pairs: tuple[dict, ...]
     no_evidence: tuple[str, ...]
     slice_result: SliceResult
+    summary: dict
+    review_disagreements: tuple[dict, ...] = ()
 
     @property
     def labeled_rows(self) -> int:
@@ -173,18 +182,25 @@ def resolve_judgments(
 
 
 def _stage_present(eval_dir: str | Path, stage: str) -> bool:
-    directory = raw_dir(eval_dir, stage)
-    return directory.is_dir() and any(directory.glob("*.csv"))
+    return bool(returned_annotators(eval_dir, stage))
+
+
+def _stage_active(eval_dir: str | Path, reports_dir: str | Path, stage: str) -> bool:
+    """A stage is active once it has returned sheets or drafted sheets."""
+    return _stage_present(eval_dir, stage) or bool(drafted_annotators(reports_dir, stage))
 
 
 def resolve_stages(
-    eval_dir: str | Path, reports_dir: str | Path, *, final: bool = False
+    eval_dir: str | Path, reports_dir: str | Path, *, final: bool = False, complete: bool = False
 ) -> tuple[Resolution, Findings]:
-    """Load pilot/round1/round2 labels + adjudication and resolve them (shared by `merge` and `gold-sheets`)."""
+    """Load pilot/round1/round2 labels + adjudication and resolve them (shared by `merge` and `gold-sheets`).
+
+    With `final` or `complete`, every drafted sheet of an active stage (pilot and round 1 always) must be back.
+    """
     findings = Findings()
     judgments: list[Judgment] = []
     for stage in JUDGMENT_STAGES:
-        need_all = final and (stage in REQUIRED_STAGES or _stage_present(eval_dir, stage))
+        need_all = (final or complete) and (stage in REQUIRED_STAGES or _stage_active(eval_dir, reports_dir, stage))
         stage_judgments, stage_findings = load_judgments(eval_dir, reports_dir, stage, require_all=need_all)
         judgments.extend(stage_judgments)
         findings.extend(stage_findings)
@@ -200,10 +216,19 @@ def resolve_stages(
     adjudications, adj_findings = load_adjudications(eval_dir)
     findings.extend(adj_findings)
     resolved, missing = resolve_judgments(judgments, adjudications)
-    known = {(j.query_id, j.chunk_id) for j in judgments}
+    labelers: dict[PairKey, set[str]] = {}
+    for j in judgments:
+        labelers.setdefault((j.query_id, j.chunk_id), set()).add(j.annotator)
     for key, adjudication in adjudications.items():
-        if key[1] != UNANSWERABLE_CHUNK_ID and key not in known:
+        if key[1] == UNANSWERABLE_CHUNK_ID:
+            continue
+        if key not in labelers:
             findings.warnings.append(f"{adjudication.where}: adjudication for {list(key)} matches no judged pair")
+        elif adjudication.adjudicator in labelers[key] and set(ANNOTATORS) - labelers[key]:
+            findings.error(
+                adjudication.where,
+                f"adjudicator {adjudication.adjudicator} labeled this pair; a third annotator must decide ({sorted(set(ANNOTATORS) - labelers[key])} did not)",
+            )
     return Resolution(tuple(judgments), adjudications, resolved, tuple(missing)), findings
 
 
@@ -247,22 +272,48 @@ def resolve_slice(
     return SliceResult(tuple(included), tuple(excluded), tuple(pending), tuple(need_adj), tuple(missing_author), replacements)
 
 
-def split_slice(included: Sequence[str]) -> dict[str, str]:
-    """Seeded 40/60 dev/heldout split, stratified by author via round-robin (E-7: still 40% if < 100 survive)."""
-    by_author: dict[str, list[str]] = {}
-    for qid in sorted(included):
-        by_author.setdefault(qid.split("-")[0], []).append(qid)
-    for author, ids in by_author.items():
+def split_slice(included: Sequence[str], existing: dict[str, str] | None = None) -> dict[str, str]:
+    """Seeded 40/60 dev/heldout split, stratified by author (E-7: still `round(0.4 n)` dev if fewer survive).
+
+    Ids that already have a split in `existing` (the committed `qa_pairs.jsonl`) keep it. Only new ids are placed:
+    dev until the dev count reaches `round(0.4 n)`, each time taking the next id of the author with the fewest dev
+    rows (ties: lowest author id); the rest go to heldout. Within an author the order is a seeded shuffle.
+    """
+    members = set(included)
+    split = {qid: s for qid, s in (existing or {}).items() if qid in members and s in ("dev", "heldout")}
+    dev_by_author: Counter[str] = Counter(qid.split("-")[0] for qid, s in split.items() if s == "dev")
+    queues: dict[str, list[str]] = {}
+    for qid in sorted(members - set(split)):
+        queues.setdefault(qid.split("-")[0], []).append(qid)
+    for author, ids in queues.items():
         seeded("split", author).shuffle(ids)
-    target = round(DEV_SHARE * len(included))
-    dev: list[str] = []
-    queues = [by_author[author] for author in sorted(by_author)]
-    while len(dev) < target and any(queues):
-        for queue in queues:
-            if queue and len(dev) < target:
-                dev.append(queue.pop(0))
-    dev_set = set(dev)
-    return {qid: ("dev" if qid in dev_set else "heldout") for qid in sorted(included)}
+    need = round(DEV_SHARE * len(members)) - sum(dev_by_author.values())
+    while need > 0 and any(queues.values()):
+        author = min((a for a, ids in queues.items() if ids), key=lambda a: (dev_by_author[a], a))
+        split[queues[author].pop(0)] = "dev"
+        dev_by_author[author] += 1
+        need -= 1
+    for ids in queues.values():
+        for qid in ids:
+            split[qid] = "heldout"
+    return {qid: split[qid] for qid in sorted(members)}
+
+
+def load_existing_splits(eval_dir: str | Path, findings: Findings) -> dict[str, str]:
+    """`split` of every unanswerable row of an existing `qa_pairs.jsonl` (kept stable across merges)."""
+    path = output_paths(eval_dir)["qa_pairs"]
+    if not path.is_file():
+        return {}
+    splits: dict[str, str] = {}
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            if row.get("answerable") is False and row.get("split") in ("dev", "heldout"):
+                splits[row["query_id"]] = row["split"]
+    except (ValueError, KeyError, OSError, AttributeError) as exc:
+        findings.warnings.append(f"cannot read existing splits from {path} ({exc!r}); the split is recomputed")
+        return {}
+    return splits
 
 
 # --- chunk ids (E-6, AD-2) ---------------------------------------------------------------------
@@ -288,10 +339,71 @@ def read_chunk_ids(kb_dir: str | Path) -> set[str]:
 # --- validate + build -------------------------------------------------------------------------
 
 
+def _listing(items: Sequence[str], limit: int = 20) -> str:
+    return ", ".join(items[:limit]) + (f", ... and {len(items) - limit} more" if len(items) > limit else "")
+
+
+def _judgment_stats(judgments: Sequence[Judgment], stages: Sequence[str]) -> dict:
+    """Labeled (query, passage) pairs, share labeled by 2+ people, pooled raw agreement and mean kappa."""
+    labels: LabelMap = {a: {} for a in ANNOTATORS}
+    people: dict[PairKey, set[str]] = {}
+    for j in judgments:
+        if j.stage in stages:
+            labels[j.annotator][(j.query_id, j.chunk_id)] = j.label
+            people.setdefault((j.query_id, j.chunk_id), set()).add(j.annotator)
+    report, _ = compute_agreement("summary", labels, binary=True)
+    doubled = sum(1 for who in people.values() if len(who) >= 2)
+    return {
+        "labeled_rows": len(people),
+        "double_labeled_pct": 100 * doubled / len(people) if people else None,
+        "raw_agreement_pooled": report.pooled_raw,
+        "cohen_kappa_mean": report.mean_kappa,
+    }
+
+
+def _label_stats(labels: LabelMap, labeled_rows: int, double_pct: float | None) -> dict:
+    report, _ = compute_agreement("summary", labels, binary=False)
+    return {
+        "labeled_rows": labeled_rows,
+        "double_labeled_pct": double_pct,
+        "raw_agreement_pooled": report.pooled_raw,
+        "cohen_kappa_mean": report.mean_kappa,
+    }
+
+
+def format_summary(summary: dict) -> str:
+    """The evaluation-plan table: labeled rows, double-labeled %, pooled raw agreement, mean kappa per artifact."""
+
+    def num(value: float | None, digits: int = 3) -> str:
+        return "n/a" if value is None else f"{value:.{digits}f}"
+
+    lines = [f"{'artifact':<24}{'rows':>8}{'double %':>10}{'raw (pooled)':>14}{'kappa':>8}"]
+    for name, stats in summary["artifacts"].items():
+        lines.append(
+            f"{name:<24}{stats['labeled_rows']:>8}{num(stats['double_labeled_pct'], 1):>10}"
+            f"{num(stats['raw_agreement_pooled']):>14}{num(stats['cohen_kappa_mean']):>8}"
+        )
+    unique = summary["unique_questions"]
+    lines.append(
+        f"unique questions: {unique['total']} ({unique['answerable']} answerable + {unique['unanswerable_slice']} unanswerable slice)"
+    )
+    lines.append(
+        f"total labeled rows: {summary['total_labeled_rows']} ({summary['qrels_rows']} qrels + {summary['qa_pairs_rows']} QA)"
+    )
+    return "\n".join(lines)
+
+
 def validate(
-    eval_dir: str | Path, reports_dir: str | Path, kb_dir: str | Path, *, final: bool = False
+    eval_dir: str | Path,
+    reports_dir: str | Path,
+    kb_dir: str | Path,
+    *,
+    final: bool = False,
+    allow_short_slice: bool = False,
+    allow_short_qa: bool = False,
 ) -> tuple[Findings, Outputs | None]:
-    """Every check before a merge; `final` adds required stages, missing adjudications and the row floor."""
+    """Every check before a merge; `final` adds required stages, missing adjudications, coverage, the row floor,
+    the 100-question 40/60 slice and the 250 answerable QA rows (relaxed by the two `allow_short_*` flags)."""
     findings = check_questions(eval_dir, kb_dir)
     questions: list[Question] = []
     try:
@@ -302,10 +414,8 @@ def validate(
     resolution, res_findings = resolve_stages(eval_dir, reports_dir, final=final)
     findings.extend(res_findings)
     if resolution.missing:
-        listing = ", ".join(f"({q}, {c})" for q, c in resolution.missing[:20]) + (
-            f", ... and {len(resolution.missing) - 20} more" if len(resolution.missing) > 20 else ""
-        )
-        message = f"{len(resolution.missing)} pair(s) need an adjudication row in adjudication.csv: {listing}"
+        pairs = [f"({q}, {c})" for q, c in resolution.missing]
+        message = f"{len(resolution.missing)} pair(s) need an adjudication row in adjudication.csv: {_listing(pairs)}"
         if final:
             findings.error(adjudication_path(eval_dir), message)
         else:
@@ -315,7 +425,7 @@ def validate(
     findings.extend(check_findings)
     gold_rows, gold_findings = load_gold_rows(eval_dir, reports_dir, require_all=final)
     findings.extend(gold_findings)
-    reviews, review_findings = load_review_rows(eval_dir, reports_dir, require_all=final and _stage_present(eval_dir, "gold-review"))
+    reviews, review_findings = load_review_rows(eval_dir, reports_dir, require_all=final)
     findings.extend(review_findings)
 
     # E-6 — every chunk id must exist in the current chunks.jsonl.
@@ -337,8 +447,41 @@ def validate(
             f"{len(absent)} chunk_id(s) not in chunks.jsonl (KB rebuilt since labeling?): " + "; ".join(first),
         )
 
+    answerable = {q.query_id: q for q in questions if q.answerable}
+    current_text = {q.query_id: normalize(q.text) for q in questions}
+
+    # H11 — a question edited after pooling no longer matches what annotators saw.
+    drifted = sorted({j.query_id for j in resolution.judgments if j.query_id in current_text and normalize(j.question) != current_text[j.query_id]})
+    if drifted:
+        findings.warnings.append(f"question text on returned sheets differs from the current question for: {_listing(drifted)}")
+
+    # Coverage — every answerable question needs at least one resolved judgment.
+    if resolution.resolved and _stage_present(eval_dir, "round1"):
+        covered = {qid for qid, _ in resolution.resolved}
+        uncovered = sorted(set(answerable) - covered)
+        if uncovered:
+            message = f"{len(uncovered)} answerable question(s) have no resolved judgment: {_listing(uncovered)}"
+            if final:
+                findings.error(raw_dir(eval_dir, "round1"), message)
+            else:
+                findings.warnings.append(message)
+        relevant = {qid for (qid, _), r in resolution.resolved.items() if r.label >= 1}
+        no_relevant = sorted((covered & set(answerable)) - relevant)
+        if no_relevant:
+            findings.warnings.append(f"{len(no_relevant)} question(s) have no passage labeled 1 or 2: {_listing(no_relevant)}")
+
+    # Unanswerable slice (E-7, H9, H10).
     slice_result = resolve_slice(questions, checks, resolution.adjudications) if checks else SliceResult((), (), (), (), (), {})
     if checks:
+        labelers_of: dict[str, set[str]] = {}
+        for c in checks:
+            labelers_of.setdefault(c.query_id, set()).add(c.annotator)
+        for (qid, cid), adjudication in resolution.adjudications.items():
+            if cid != UNANSWERABLE_CHUNK_ID:
+                continue
+            people = labelers_of.get(qid, set()) | ({parse_query_id(qid)[0]} if parse_query_id(qid) else set())
+            if adjudication.adjudicator in people and set(ANNOTATORS) - people:
+                findings.error(adjudication.where, f"adjudicator {adjudication.adjudicator} is the author or a double-checker of {qid}; a third annotator must decide")
         if slice_result.missing_author:
             findings.error(
                 raw_dir(eval_dir, "unanswerable"),
@@ -361,14 +504,26 @@ def validate(
                 f"{qid} answered 'yes' (library can answer it): needs a replacement question"
                 + (f" (author proposes: {proposed})" if proposed else "")
             )
+        n_slice = len(slice_result.included)
         findings.info.append(
-            f"unanswerable slice: {len(slice_result.included)} of {SLICE_SIZE} questions survive"
-            + ("" if len(slice_result.included) >= SLICE_SIZE else " (below the target)")
+            f"unanswerable slice: {n_slice} of {SLICE_SIZE} questions survive" + ("" if n_slice >= SLICE_SIZE else " (below the target)")
         )
+        if n_slice > SLICE_SIZE:
+            replacements = [q for q in slice_result.included if parse_query_id(q)[2] > N_UNANSWERABLE]  # type: ignore[index]
+            extras = replacements if len(replacements) >= n_slice - SLICE_SIZE else list(slice_result.included[SLICE_SIZE:])
+            findings.error(
+                raw_dir(eval_dir, "unanswerable"),
+                f"the slice has {n_slice} questions (more than {SLICE_SIZE}); extras to drop: {_listing(list(extras))}",
+            )
+        elif final and n_slice < SLICE_SIZE and not allow_short_slice:
+            findings.error(
+                raw_dir(eval_dir, "unanswerable"),
+                f"the slice has {n_slice} of {SLICE_SIZE} questions; finish the replacements or pass --allow-short-slice",
+            )
 
+    # Gold answers (E-8).
     no_evidence: list[str] = []
     qa_rows: list[dict] = []
-    answerable = {q.query_id: q for q in questions if q.answerable}
     if gold_rows:
         gold_by_query = {g.query_id: g for g in gold_rows}
         two_labeled: dict[str, set[str]] = {}
@@ -404,13 +559,30 @@ def validate(
             )
         if no_evidence:
             findings.warnings.append(f"{len(no_evidence)} NO_EVIDENCE gold answer(s), kept out of qa_pairs: {', '.join(no_evidence)}")
-    for review in reviews:
-        if review.review == "disagree":
-            findings.warnings.append(f"{review.where}: {review.annotator} disagrees with the gold answer of {review.query_id}: {review.reason or '(no reason)'}")
+        message = f"answerable QA rows: {len(qa_rows)} (floor {ANSWERABLE_QA_FLOOR}); NO_EVIDENCE: {', '.join(no_evidence) or 'none'}"
+        if len(qa_rows) < ANSWERABLE_QA_FLOOR:
+            if final and not allow_short_qa:
+                findings.error(raw_dir(eval_dir, "gold"), message + "; pass --allow-short-qa to accept")
+            else:
+                findings.info.append(message + " (below the floor)")
+        else:
+            findings.info.append(message)
+    review_disagreements = tuple(
+        {"query_id": r.query_id, "reviewer": r.annotator, "reason": r.reason}
+        for r in sorted(reviews, key=lambda r: (r.query_id, r.annotator))
+        if r.review == "disagree"
+    )
+    for item in review_disagreements:
+        findings.warnings.append(f"gold review: {item['reviewer']} disagrees with the gold answer of {item['query_id']}: {item['reason'] or '(no reason)'}")
 
     outputs: Outputs | None = None
     if questions and not findings.errors:
-        split = split_slice(slice_result.included)
+        existing = load_existing_splits(eval_dir, findings)
+        split = split_slice(slice_result.included, existing)
+        n_dev = sum(1 for s in split.values() if s == "dev")
+        if final and not allow_short_slice and split and (n_dev, len(split) - n_dev) != (40, 60):
+            findings.error(output_paths(eval_dir)["qa_pairs"], f"split is {n_dev} dev / {len(split) - n_dev} heldout, expected 40 / 60")
+            return findings, None
         by_id = {q.query_id: q for q in questions}
         queries = [
             {"query_id": q.query_id, "text": q.text, "type": q.type, "subfield": q.subfield, "answerable": True, "author": q.author}
@@ -428,12 +600,65 @@ def validate(
             {"query_id": r.query_id, "chunk_id": r.chunk_id, "relevance": r.label, "annotators": list(r.annotators), "adjudicated": r.adjudicated}
             for _, r in sorted(resolution.resolved.items())
         ]
+        n_answerable_qa = sum(1 for row in qa_rows if row["answerable"])
+        # --- summary (what agreement-report.md is filled from)
+        review_labels: LabelMap = {a: {} for a in ANNOTATORS}
+        for r in reviews:
+            review_labels[r.annotator][r.query_id] = r.review
+            parsed = parse_query_id(r.query_id)
+            if parsed is not None and parsed[0] != r.annotator:
+                review_labels[parsed[0]][r.query_id] = "agree"
+        qa_ids = {row["query_id"] for row in qa_rows if row["answerable"]}
+        reviewed_qa = [r for r in reviews if r.query_id in qa_ids]
+        unans_labels: LabelMap = {a: {} for a in ANNOTATORS}
+        unans_people: dict[str, set[str]] = {}
+        for c in checks:
+            unans_labels[c.annotator][c.query_id] = c.answer
+            unans_people.setdefault(c.query_id, set()).add(c.annotator)
+        n_unans = len(unans_people)
+        gold_review_stats = _label_stats(review_labels, len(reviews), 100.0 if reviews else None)
+        summary = {
+            "artifacts": {
+                "qrels_pilot_round1": _judgment_stats(resolution.judgments, ("pilot", "round1")),
+                "qrels_round2": _judgment_stats(resolution.judgments, ("round2",)),
+                "qa_pairs_answerable": {
+                    "labeled_rows": n_answerable_qa,
+                    "double_labeled_pct": 100 * len({r.query_id for r in reviewed_qa}) / n_answerable_qa if n_answerable_qa else None,
+                    "raw_agreement_pooled": sum(r.review == "agree" for r in reviewed_qa) / len(reviewed_qa) if reviewed_qa else None,
+                    "cohen_kappa_mean": None,
+                },
+                "unanswerable_check": _label_stats(
+                    unans_labels, n_unans, 100 * sum(1 for who in unans_people.values() if len(who) >= 2) / n_unans if n_unans else None
+                ),
+                "gold_review": gold_review_stats,
+            },
+            "unique_questions": {
+                "answerable": len(answerable),
+                "unanswerable_slice": len(slice_result.included),
+                "total": len(answerable) + len(slice_result.included),
+            },
+            "qrels_rows": len(qrels),
+            "qa_pairs_rows": len(qa_rows),
+            "total_labeled_rows": len(qrels) + len(qa_rows),
+            "unanswerable_slice": {
+                "size": len(slice_result.included),
+                "dev": n_dev,
+                "heldout": len(split) - n_dev,
+                "excluded_yes": list(slice_result.excluded_yes),
+                "pending": list(slice_result.pending),
+            },
+            "no_evidence": list(no_evidence),
+            "gold_review_disagreements": list(review_disagreements),
+            "notes": {"cohen_kappa_mean": "mean over annotator pairs where kappa is defined; gold_review kappa is not meaningful (the author is always `agree`)"},
+        }
         outputs = Outputs(
             tuple(sorted(queries, key=lambda row: row["query_id"])),
             tuple(qrels),
             tuple(sorted(qa_rows, key=lambda row: row["query_id"])),
             tuple(no_evidence),
             slice_result,
+            summary,
+            review_disagreements,
         )
         message = f"labeled rows: {len(outputs.qrels)} qrels + {len(outputs.qa_pairs)} QA = {outputs.labeled_rows} (floor {LABEL_FLOOR})"
         if outputs.labeled_rows < LABEL_FLOOR:
@@ -456,22 +681,51 @@ def _jsonl(rows: Sequence[dict]) -> bytes:
 
 
 def write_outputs(eval_dir: str | Path, outputs: Outputs, *, replace: bool) -> list[Path]:
-    """Write the three JSONL files atomically; refuses to overwrite existing ones without `replace`."""
+    """Write the three JSONL files as a set; refuses to overwrite existing ones without `replace`.
+
+    Existing files are copied to `<name>.bak` first; all three temp files are written, then replaced one by one.
+    On any failure the originals are restored from the `.bak` copies (new files are removed) and the temp files
+    are deleted; the `.bak` copies are deleted only after all three replacements succeeded.
+    """
     paths = output_paths(eval_dir)
     existing = [str(p) for p in paths.values() if p.exists()]
     if existing and not replace:
         raise LabelingStageError("merge", f"refusing to overwrite existing {', '.join(existing)}; pass --replace to overwrite")
     payloads = {"queries": outputs.queries, "qrels": outputs.qrels, "qa_pairs": outputs.qa_pairs}
+    backups: dict[str, Path] = {}
     tmps: dict[str, Path] = {}
+    replaced: list[str] = []
     try:
         for name, path in paths.items():
             path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists():
+                backups[name] = path.with_name(path.name + ".bak")
+                shutil.copy2(path, backups[name])
+        for name, path in paths.items():
             tmp = path.with_name(path.name + ".tmp")
             tmp.write_bytes(_jsonl(payloads[name]))
             tmps[name] = tmp
         for name, path in paths.items():
             os.replace(tmps[name], path)
-    finally:
+            replaced.append(name)
+    except BaseException:
+        for name in replaced:
+            if name in backups:
+                shutil.copyfile(backups[name], paths[name])
+            else:
+                paths[name].unlink(missing_ok=True)
         for tmp in tmps.values():
             tmp.unlink(missing_ok=True)
+        for backup in backups.values():
+            backup.unlink(missing_ok=True)
+        raise
+    for backup in backups.values():
+        backup.unlink(missing_ok=True)
     return list(paths.values())
+
+
+def write_summary(reports_dir: str | Path, outputs: Outputs) -> Path:
+    """`<reports-dir>/labeling/merge_summary.json` (class 3)."""
+    path = Path(reports_dir) / "labeling" / "merge_summary.json"
+    atomic_write(path, (json.dumps(outputs.summary, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    return path
